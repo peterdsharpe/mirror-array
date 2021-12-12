@@ -4,6 +4,7 @@ import aerosandbox.tools.pretty_plots as p
 import hexy as hx
 import pyvista as pv
 import stl
+from utilities.coordinate_math import Plane
 
 """
 Notes:
@@ -12,6 +13,8 @@ Suffixes:
 * _h = hexagonal (cube) planar coordinates
 * _p = pixel planar coordinates
 * _3 = 3D coordinates
+
+Units in inches.
 
 """
 
@@ -28,6 +31,17 @@ hex_centers_h = hx.get_spiral(
 #     [0, 0, 0]
 # ])
 hex_radius = 1
+
+mirror_plane = Plane(
+    origin=np.array([0, 0, 0]),
+    normal=np.array([1, 0, 0]),
+    x_hat_p=np.array([0, 1, 0])
+)
+target_plane = Plane(
+    origin=np.array([0, 0, -30]),
+    normal=np.array([0, 0, 1]),
+    x_hat_p=np.array([0, -1, 0])
+)
 
 ### Auxiliary
 N = hex_centers_h.shape[0]
@@ -59,6 +73,9 @@ hex_corners_p = hx.cube_to_pixel(hex_corners_h.reshape((-1, 3)), radius=hex_radi
 
 ### Assign targets
 t = np.linspace(0, 2 * np.pi, N, endpoint=False)
-targets = np.stack((
-
+targets_p = 10 * np.stack((
+    np.cos(t),
+    np.sin(t),
 ))
+
+targets_
