@@ -1,5 +1,5 @@
 import numpy as np
-from vector import normalize
+from utilities.vector import normalize
 
 def compute_orientations(
         source_locations,
