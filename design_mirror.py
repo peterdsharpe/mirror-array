@@ -28,7 +28,7 @@ source_location = np.array([
 
 mirrors_h = hx.get_spiral(
     center=[0, 0, 0],
-    radius_end=2
+    radius_end=5
 )
 radius_p = 1
 N = mirrors_h.shape[0]
@@ -46,12 +46,12 @@ mirror_plane = Plane(
     x_hat_3=np.array([0, 1, 0])
 )
 target_plane = Plane(
-    origin_3=np.array([0, 0, -20]),
+    origin_3=np.array([25, 0, -20]),
     normal_3=np.array([0, 0, 1]),
     x_hat_3=np.array([0, -1, 0])
 )
 focal_plane = Plane(
-    origin_3=np.array([0, 0, -25]),
+    origin_3=np.array([25, 0, -20]),
     normal_3=target_plane.normal_3,
     x_hat_3=target_plane.x_hat_3,
 )
@@ -72,28 +72,26 @@ mirror_corners_h = (
 mirror_corners_p = hx.cube_to_pixel(mirror_corners_h.reshape((-1, 3)), radius=radius_p).reshape((6, -1, 2))
 
 ### Plot mirror plane
-# fig, ax = plt.subplots()
-# plt.scatter(hex_centers_p[:, 0], hex_centers_p[:, 1], c="k")
-# for i in range(N):
-#     plt.fill(
-#         hex_corners_p[:, i, 0],
-#         hex_corners_p[:, i, 1],
-#         alpha=0.4
-#     )
-# p.equal()
-# p.set_ticks(1, 1, 1, 1)
-# p.show_plot()
+fig, ax = plt.subplots()
+plt.scatter(mirrors_p[:, 0], mirrors_p[:, 1], c="k")
+for i in range(N):
+    plt.fill(
+        mirror_corners_p[:, i, 0],
+        mirror_corners_p[:, i, 1],
+        alpha=0.4
+    )
+p.equal()
+p.set_ticks(1, 1, 1, 1)
+p.show_plot()
 
 ### Assign targets
 targets_3 = target_plane.to_3D(targets_p)
 
 from utilities.optimize_targets import *
-try:
-    best_order = optimize_by_permuting(
-        mirrors_3, targets_3
-    )
-except KeyboardInterrupt:
-    pass
+
+best_order = optimize_none(
+    mirrors_3, targets_3
+)
 
 targets_3 = targets_3[best_order]
 
@@ -126,7 +124,7 @@ for i in range(N):
         mirror_normals_3[i, :],
     )
     poly.rotate_vector(vector=axis, angle=180 / np.pi * angle)
-
+    poly.rotate_vector(vector=[0,1,0], angle=5)
     poly.translate(mirrors_3[i, :])
     plotter.add_mesh(poly)
 
