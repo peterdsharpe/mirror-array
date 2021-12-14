@@ -1,14 +1,9 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import aerosandbox.tools.pretty_plots as p
-# import hexy as hx
 import pyvista as pv
-import stl
 from utilities.vector import normalize
 from utilities.coordinate_math import Plane, angle_axis_from_vectors
 from utilities.reflection_math import compute_orientations
-from scipy import spatial
-import copy
+from typing import List
 
 """
 Notes:
@@ -28,20 +23,14 @@ source_location = np.array([
 ])
 
 # Mirror properties
-size = 5  # How many triangle-edges from the center of the big mirror to the outside?
+size = 6  # How many triangle-edges from the center of the big mirror to the outside?
 mirror_side_length = 1  # What's the side length of the triangles?
 bevel_width = 1.5 / 25.4
 side_length = mirror_side_length + bevel_width
-spacing = 2 / 25.4  # What's the gap between adjacent triangles?
+spacing = 1.5 / 25.4  # What's the gap between adjacent triangles?
 bevel_height = 1.5 / 25.4
 
-mirror_plane = Plane(
-    origin_3=np.array([0, 0, 0]),
-    normal_3=np.array([1, 0, -0.3]),
-    x_hat_3=np.array([0, 1, 0])
-)
-
-N = 6 * size ** 2 # The total number of triangles there will be
+N = 6 * size ** 2  # The total number of triangles there will be
 
 # Target properties
 t = np.linspace(0, 2 * np.pi, N, endpoint=False)
@@ -51,18 +40,34 @@ targets_p = 10 * np.stack((
 ), axis=-1)
 
 target_plane = Plane(
-    origin_3=np.array([20, 0, -20]),
+    origin_3=np.array([36, 0, -36]),
     normal_3=np.array([0, 0, 1]),
     x_hat_3=np.array([0, -1, 0])
 )
 focal_plane = Plane(
-    origin_3=np.array([20, 0, -20]),
+    origin_3=np.array([20, 0, -50]),
     normal_3=target_plane.normal_3,
     x_hat_3=target_plane.x_hat_3,
 )
 
+### Setup
+targets_3 = target_plane.to_3D(targets_p)
+mean_target = np.mean(targets_3, axis=0)
+mean_mirror = np.array([0, 0, 0])
+mirror_to_source = normalize(source_location - mean_mirror)
+mirror_to_target = normalize(mean_target - mean_mirror)
+mirror_plane_normal = normalize(mirror_to_source + mirror_to_target)
+
 ### Compute locations of mirrors
-mirrors = []
+
+
+mirror_plane = Plane(
+    origin_3=mean_mirror,
+    normal_3=mirror_plane_normal,
+    x_hat_3=np.array([0, 1, 0])
+)
+
+mirrors: List[pv.PolyData] = []
 
 rt3 = np.sqrt(3)
 for ring_number in np.arange(size) + 1:
@@ -100,7 +105,7 @@ for ring_number in np.arange(size) + 1:
 
 assert N == len(mirrors)
 
-mirrors_3 = np.stack(
+mirrors_3 = np.stack(  # The locations of the centers of the mirrors.
     [
         mirror.center_of_mass()
         for mirror in mirrors
@@ -109,7 +114,6 @@ mirrors_3 = np.stack(
 )  # shape: (tri_id, axis_id)
 
 ### Assign targets
-targets_3 = target_plane.to_3D(targets_p)
 
 from utilities.optimize_targets import *
 
@@ -120,9 +124,6 @@ best_order = optimize_none(
 targets_3 = targets_3[best_order]
 
 ### Compute orientations
-mirror_to_source = normalize(source_location - mirrors_3)
-mirror_to_target = normalize(targets_3 - mirrors_3)
-
 mirror_normals_3 = compute_orientations(
     source_locations=source_location,
     mirror_locations=mirrors_3,
@@ -149,6 +150,7 @@ mirrors = [
 ]
 mirror_faces = copy.deepcopy(mirrors)
 
+
 # Add in bevels
 def make_bevel(
         mirror,
@@ -170,16 +172,6 @@ def make_bevel(
     return bevel
 
 
-mirror_corners_3 = np.stack(
-    [
-        np.stack([
-            mirror.points[point_id, :]
-            for mirror in mirrors
-        ], axis=0)
-        for point_id in range(3)
-    ], axis=0
-)  # shape: (point_id, tri_id, axis_id)
-
 bevels = [
              make_bevel(mirror, far_corner_id=1)
              for mirror in mirrors
@@ -189,8 +181,19 @@ bevels = [
          ]
 
 # Extrude the mirrors
+mirror_corners_3 = np.concatenate(
+    [
+        face.points
+        for face in mirror_faces
+    ], axis=0
+)  # shape: (corner_id, axis_id)
+depth = np.dot(
+    mirror_corners_3 - mirror_plane.origin_3.reshape((1, 3)),
+    mirror_plane.normal_3
+).max()
+
 mirrors = [
-    mirror.extrude(vector=-1 * mirror_plane.normal_3 * side_length, capping=True)
+    mirror.extrude(vector=-3 * depth * mirror_plane.normal_3, capping=True)
     for mirror in mirrors
 ]
 
@@ -206,25 +209,45 @@ base.points = mirror_plane.to_3D(
     base.points[:, :2]
 )
 
-base.translate(-0.4 * side_length * mirror_plane.normal_3)
-base = base.extrude(vector=-1 * mirror_plane.normal_3 * side_length, capping=True)
+base.translate(-depth * mirror_plane.normal_3)
+base = base.extrude(vector=-3 * depth * mirror_plane.normal_3, capping=True)
+
+# Merge everything
+things = [base] + mirrors + bevels
+things = [
+    thing.triangulate()
+    for thing in things
+]
+
+print = pv.PolyData().merge(things)
+
+### Export print
+print_mm = copy.deepcopy(print)
+angle, axis = angle_axis_from_vectors(
+    mirror_plane.normal_3,
+    [0, 0, 1]
+)
+print_mm.rotate_vector(axis, angle * 180 / np.pi, point=mirror_plane.origin_3)
+print_mm.scale(25.4)
+print_mm.save("print.stl")
 
 ### Draw everything
 plotter = pv.Plotter(lighting="three lights")
 
-for mirror in mirrors:  # Draw the mirrors
-    plotter.add_mesh(mirror)
-
+plotter.add_mesh(print)
+# for mirror in mirrors:  # Draw the mirrors
+#     plotter.add_mesh(mirror)
+#
 for face in mirror_faces:
     plotter.add_mesh(face, color=np.array([242, 222, 197]) / 255)
-
-plotter.add_mesh(base)
-
-for bevel in bevels:
-    plotter.add_mesh(bevel)
+#
+# plotter.add_mesh(base)
+#
+# for bevel in bevels:
+#     plotter.add_mesh(bevel, color="red")
 
 plotter.add_points(  # Draw the intended targets
-    targets_3, color=(0.2, 0.2, 0.2)
+    targets_3, color=0.2 * np.ones(3)
 )
 
 # Draw optics and actual targets
@@ -245,8 +268,8 @@ for i in range(N):
             mirrors_3[i, :],
             actual_target
         ]),
-        color=(0.2, 0.2, 0.2),
-        width=1
+        color=0.2 * np.ones(3),
+        width=0.2
     )
     plotter.add_points(points=actual_target)
 
@@ -257,4 +280,5 @@ for i in range(N):
 
 plotter.add_axes()
 # plotter.show_grid()
+plotter.title = "Mirror for Marta"
 plotter.show()
