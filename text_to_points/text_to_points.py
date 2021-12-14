@@ -1,10 +1,9 @@
-import os, sys
 from pathlib import Path
-import svgpathtools
 import svgpathtools as spt
 from xml.dom import minidom
 import numpy as np
 
+# font_to_use = 'script'
 font_to_use = 'multicolore'
 
 alphabet_folder = Path("./alphabet_svgs")
@@ -36,83 +35,96 @@ letter_spacings = {
         spacings
     )
 }
-letter_spacings[" "] = 100
+representative_bbox = letter_paths["O"].bbox()
+letter_height = representative_bbox[3] - representative_bbox[2]
+letter_spacings[" "] = letter_spacings["l"]
 
 import matplotlib.pyplot as plt
 import aerosandbox.tools.pretty_plots as p
 
 
-def get_points_from_letter(l: str = "A", n_points=50):
-    path = letter_paths[l]
-    lengths_nondim = np.linspace(0, 1, n_points) * path.length()
-    t = np.array([path.ilength(l) for l in lengths_nondim])
-    points_complex = np.array([path.point(ti) for ti in t])
-    # Scale
-    points_complex += 1
-    points_complex /= 187.5
-    # TODO
+def get_points_from_string(s: str = "Testing", n_points=200, line_spacing=1.5):
+    # Clean up string
+    s = "\n".join([line.strip() for line in s.split("\n")])  # strip spaces off each line
+    admissible_characters = alphabet_characters + "\n" + " "
+    for l in s:
+        if l not in admissible_characters:
+            s = s.replace(l, "")
+            import warnings
+            warnings.warn(f"Removed inadmissible character '{l}'.", stacklevel=2)
 
-    x = np.real(points_complex)
-    y = np.imag(points_complex) * -1
+    # Calculate line lengths
+    def get_line_length(s_line):
+        assert "\n" not in s_line
+        length = 0
+        for l in s_line:
+            length += letter_spacings[l]
+        return length
 
-    points = np.stack([x, y], axis=1)
-    return points
+    # Compute all subpaths of letters, and where they should be
+    subpaths = []
+    sp_offsets = []
 
+    for lineno, line in enumerate(s.split("\n")):
+        line_length = get_line_length(line)
+        line_origin = -line_length / 2 + line_spacing * letter_height * lineno * 1j
+        current_offset_on_line = 0
+        for l in line:
+            if not l == " ":
+                sp = letter_paths[l].continuous_subpaths()
+                subpaths.extend(sp)
+                sp_offsets.extend(len(sp) * [line_origin + current_offset_on_line])
 
-fig, ax = plt.subplots()
-l = "A"
-n_points = 21
-c = get_points_from_letter(l, n_points)
-plt.plot(
-    c[:, 0],
-    c[:, 1],
-    ".",
-    markersize=10,
-)
-p.equal()
-p.show_plot()
+            current_offset_on_line += letter_spacings[l]
 
-
-def get_points_from_string(s: str = "Testing", n_points=200):
-    letter_path_lengths = np.array([
-        letter_paths[l].length() if l != " " else 0
-        for l in s
+    # Compute how many points each subpath gets
+    sp_lengths = np.array([
+        sp.length() for sp in subpaths
     ])
-    total_path_lengths = np.sum(letter_path_lengths)
+    total_length = np.sum(sp_lengths)
+    sp_n_points_ideal = n_points * sp_lengths / total_length
+    sp_n_points = np.floor(sp_n_points_ideal).astype(int)
+    for i in range(n_points - np.sum(sp_n_points)):
+        sp_n_points[np.argmax(sp_n_points_ideal - sp_n_points)] += 1
 
-    # Compute how many points each letter gets
-    letter_n_points_ideal = n_points * letter_path_lengths / total_path_lengths
-    letter_n_points = np.floor(letter_n_points_ideal).astype(int)
-    for i in range(n_points - np.sum(letter_n_points)):
-        letter_n_points[np.argmax(letter_n_points_ideal - letter_n_points)] += 1
-
-    # Pick points for each letter
+    # Pick points for each subpath
     points = []
 
-    x_origin = 0
+    for sp, length, offset, sp_n in zip(subpaths, sp_lengths, sp_offsets, sp_n_points):
+        lengths_nondim = np.linspace(0, 1, sp_n) * length
+        t = np.array([sp.ilength(l) for l in lengths_nondim])
+        points_complex = np.array([sp.point(ti) for ti in t])
+        # Scale
+        points_complex += offset
+        points_complex /= letter_height
 
-    for i, l in enumerate(s):
+        x = np.real(points_complex)
+        y = np.imag(points_complex) * -1
 
-        if not l == " ":
-            p = get_points_from_letter(l, n_points=letter_n_points[i])
-            p[:, 0] += x_origin
-            points.append(p)
-
-        x_origin += letter_spacings[l] / 187.5
+        sp_points = np.stack([x, y], axis=1)
+        points.append(sp_points)
 
     points = np.concatenate(points, axis=0)
+    xlim = (points[:, 0].min(), points[:, 0].max())
+    ylim = (points[:, 1].min(), points[:, 1].max())
+    points -= np.array([
+        (xlim[0] + xlim[1]) / 2,
+        (ylim[0] + ylim[1]) / 2,
+    ])
 
     return points
 
-# fig, ax = plt.subplots()
-# s= "Sei la mia luce"
-# n_points = 200
-# c = get_points_from_string(s, n_points)
-# plt.plot(
-#     c[:, 0],
-#     c[:, 1],
-#     ".",
-#     markersize=3,
-# )
-# p.equal()
-# p.show_plot()
+
+if __name__ == '__main__':
+    fig, ax = plt.subplots()
+    s = "Marta you are\nmy sunshine"
+    n_points = 294
+    c = get_points_from_string(s, n_points)
+    plt.plot(
+        c[:, 0],
+        c[:, 1],
+        ".",
+        markersize=3,
+    )
+    p.equal()
+    p.show_plot()
