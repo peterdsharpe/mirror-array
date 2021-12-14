@@ -23,7 +23,7 @@ source_location = np.array([
 ])
 
 # Mirror properties
-size = 6  # How many triangle-edges from the center of the big mirror to the outside?
+size = 7  # How many triangle-edges from the center of the big mirror to the outside?
 mirror_side_length = 1  # What's the side length of the triangles?
 bevel_width = 1.5 / 25.4
 side_length = mirror_side_length + bevel_width
@@ -33,10 +33,10 @@ bevel_height = 1.5 / 25.4
 N = 6 * size ** 2  # The total number of triangles there will be
 
 # Target properties
-t = np.linspace(0, 2 * np.pi, N, endpoint=False)
-targets_p = 10 * np.stack((
-    np.cos(t),
-    np.sin(t),
+t = 2 * np.pi * np.linspace(0, 1, N, endpoint=False)
+targets_p = 5 * t.reshape(-1, 1) * np.stack((
+    np.cos(-size * t),
+    np.sin(-size * t),
 ), axis=-1)
 
 target_plane = Plane(
@@ -45,7 +45,7 @@ target_plane = Plane(
     x_hat_3=np.array([0, -1, 0])
 )
 focal_plane = Plane(
-    origin_3=np.array([20, 0, -50]),
+    origin_3=np.array([20, 0, -40]),
     normal_3=target_plane.normal_3,
     x_hat_3=target_plane.x_hat_3,
 )
@@ -117,9 +117,11 @@ mirrors_3 = np.stack(  # The locations of the centers of the mirrors.
 
 from utilities.optimize_targets import *
 
+print("Optimizing...")
 best_order = optimize_none(
     mirrors_3, targets_3
 )
+print("Optimized.")
 
 targets_3 = targets_3[best_order]
 
@@ -219,22 +221,22 @@ things = [
     for thing in things
 ]
 
-print = pv.PolyData().merge(things)
+model = pv.PolyData().merge(things)
 
 ### Export print
-print_mm = copy.deepcopy(print)
+model_mm = copy.deepcopy(model)
 angle, axis = angle_axis_from_vectors(
     mirror_plane.normal_3,
     [0, 0, 1]
 )
-print_mm.rotate_vector(axis, angle * 180 / np.pi, point=mirror_plane.origin_3)
-print_mm.scale(25.4)
-print_mm.save("print.stl")
+model_mm.rotate_vector(axis, angle * 180 / np.pi, point=mirror_plane.origin_3)
+model_mm.scale(25.4)
+model_mm.save("print.stl")
 
 ### Draw everything
 plotter = pv.Plotter(lighting="three lights")
 
-plotter.add_mesh(print)
+plotter.add_mesh(model)
 # for mirror in mirrors:  # Draw the mirrors
 #     plotter.add_mesh(mirror)
 #
