@@ -27,11 +27,13 @@ def loss(
         distance_factor * (1 - cosine),
     )
 
+
 def optimize_none(
         mirrors_3,
         targets_3,
 ):
     return np.arange(len(mirrors_3))
+
 
 def optimize_naive(
         mirrors_3,
@@ -54,6 +56,14 @@ def optimize_naive(
         pass
 
     return best_order
+
+
+def optimize_bartlett(
+        mirrors_3,
+        targets_3,
+):
+    mean_target = np.mean(targets_3, axis=0)
+
 
 
 def optimize_anneal(

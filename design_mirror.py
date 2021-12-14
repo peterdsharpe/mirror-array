@@ -4,6 +4,7 @@ from utilities.vector import normalize
 from utilities.coordinate_math import Plane, angle_axis_from_vectors
 from utilities.reflection_math import compute_orientations
 from typing import List
+from text_to_points.text_to_points import get_points_from_string
 
 """
 Notes:
@@ -33,11 +34,8 @@ bevel_height = 1.5 / 25.4
 N = 6 * size ** 2  # The total number of triangles there will be
 
 # Target properties
-t = 2 * np.pi * np.linspace(0, 1, N, endpoint=False)
-targets_p = 5 * t.reshape(-1, 1) * np.stack((
-    np.cos(-size * t),
-    np.sin(-size * t),
-), axis=-1)
+target_message = "Marta\nyou are my\nlight"
+target_scale = 5
 
 target_plane = Plane(
     origin_3=np.array([36, 0, -36]),
@@ -45,12 +43,17 @@ target_plane = Plane(
     x_hat_3=np.array([0, -1, 0])
 )
 focal_plane = Plane(
-    origin_3=np.array([20, 0, -40]),
+    origin_3=np.array([36, 0, -48]),
     normal_3=target_plane.normal_3,
-    x_hat_3=target_plane.x_hat_3,
 )
 
 ### Setup
+print("Generating targets...")
+targets_p = target_scale * get_points_from_string(
+    s=target_message,
+    n_points=N,
+)
+print("Targets generated.")
 targets_3 = target_plane.to_3D(targets_p)
 mean_target = np.mean(targets_3, axis=0)
 mean_mirror = np.array([0, 0, 0])
@@ -112,13 +115,14 @@ mirrors_3 = np.stack(  # The locations of the centers of the mirrors.
     ],
     axis=0
 )  # shape: (tri_id, axis_id)
+mirrors_p = mirror_plane.to_p(mirrors_3)
 
 ### Assign targets
 
 from utilities.optimize_targets import *
 
-print("Optimizing...")
-best_order = optimize_none(
+print("Optimizing mirror-target matching...")
+best_order = optimize_bartlett(
     mirrors_3, targets_3
 )
 print("Optimized.")
@@ -231,7 +235,9 @@ angle, axis = angle_axis_from_vectors(
 )
 model_mm.rotate_vector(axis, angle * 180 / np.pi, point=mirror_plane.origin_3)
 model_mm.scale(25.4)
-model_mm.save("print.stl")
+print("Writing print files...")
+model_mm.save("to_print/print.stl")
+print("Written.")
 
 ### Draw everything
 plotter = pv.Plotter(lighting="three lights")

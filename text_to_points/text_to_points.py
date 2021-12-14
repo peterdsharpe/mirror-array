@@ -6,7 +6,7 @@ import numpy as np
 # font_to_use = 'script'
 font_to_use = 'multicolore'
 
-alphabet_folder = Path("./alphabet_svgs")
+alphabet_folder = Path(__file__).parent / "alphabet_svgs"
 
 with open(alphabet_folder / "alphabet_characters.txt", "r") as f:
     alphabet_characters = f.read()

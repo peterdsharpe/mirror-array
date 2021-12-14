@@ -20,7 +20,7 @@ class Plane:
         v_3 = v_3 - self.origin_3
         x = np.dot(v_3, self.x_hat_3)
         y = np.dot(v_3, self.y_hat_3)
-        return np.stack((x, y))
+        return np.stack((x, y),axis=-1)
 
     def intersection_with_line_3(self,
                                  line_origin_3=np.array([0, 0, 0]),
