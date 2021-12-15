@@ -130,11 +130,11 @@ from utilities.optimize_targets import *
 
 print("Optimizing mirror-target matching...")
 
-# best_order = optimize_none(N)
+best_order = optimize_none(N)
 # best_order = optimize_naive(mirrors_3, targets_3, n_iter=10 ** 4)
-best_order = optimize_bartlett(mirror_faces, mirrors_p, targets_p, partition_by="ring")
+# best_order = optimize_bartlett(mirror_faces, mirrors_p, targets_p, partition_by="ring")
 
-tune_order(best_order, mirrors_3, targets_3, n_iter=100000)
+best_order = optimize_anneal(best_order, mirrors_3, targets_3, n_iter=100000)
 
 assert len(best_order) == len(np.unique(best_order))
 print("Optimized.")
