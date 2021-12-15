@@ -2,29 +2,56 @@ from utilities.vector import normalize
 import numpy as np
 from scipy import spatial
 import copy
+import numba
+import pyjion
+pyjion.enable()
+
+# @numba.jit(nopython=True)
+def normalize_jit(v):
+    norms = np.sqrt(
+        v[:, 0] ** 2 +
+        v[:, 1] ** 2 +
+        v[:, 2] ** 2
+    )
+    norms = np.expand_dims(norms, -1)
+    return v / norms
 
 
+# @numba.jit(nopython=True)
 def loss(
         mirrors_3,
         targets_3,
 ):
-    mirror_to_target = normalize(targets_3 - mirrors_3)
+    N = len(mirrors_3)
+    pairwise_distances_sqr = np.zeros((N, N))
+    for i in range(N):
+        for j in range(N):
+            ti = targets_3[i, :]
+            tj = targets_3[j, :]
+            pairwise_distances_sqr[i, j] = (
+                    (ti[0] - tj[0]) ** 2 +
+                    (ti[1] - tj[1]) ** 2 +
+                    (ti[2] - tj[2]) ** 2
+            )
+    mirror_to_target = targets_3 - mirrors_3
+    mirror_to_target = normalize_jit(mirror_to_target)
 
-    cosine = np.einsum(
-        "ik,jk->ij",
-        mirror_to_target,
-        mirror_to_target,
+    cosine = np.zeros((N, N))
+    for i in range(N):
+        for j in range(N):
+            ri = mirror_to_target[i]
+            rj = mirror_to_target[j]
+            cosine[i, j] = (
+                    ri[0] * rj[0] +
+                    ri[1] * rj[1] +
+                    ri[2] * rj[2]
+            )
+
+    losses = (
+            (1 / (pairwise_distances_sqr + 1)) *
+            (1 - cosine)
     )
-
-    pairwise_distances = spatial.distance.squareform(
-        spatial.distance.pdist(targets_3)
-    )
-
-    distance_factor = 1 / ((pairwise_distances / 1) ** 2 + 1)
-
-    return np.sum(
-        distance_factor * (1 - cosine),
-    )
+    return np.sum(losses)
 
 
 def optimize_none(N):
@@ -34,7 +61,7 @@ def optimize_none(N):
 def optimize_naive(
         mirrors_3,
         targets_3,
-        n_iter: int,
+        n_iter=1000,
 ):
     order = np.arange(len(mirrors_3))
 
@@ -42,7 +69,7 @@ def optimize_naive(
     best_loss = loss(mirrors_3, targets_3[order, :])
 
     try:
-        while True:
+        for i in range(n_iter):
             np.random.shuffle(order)
             this_loss = loss(mirrors_3, targets_3[order, :])
             if this_loss < best_loss:
@@ -59,6 +86,7 @@ def optimize_bartlett(
         mirror_faces,
         mirrors_p,
         targets_p,
+        partition_by="ring",
 ):
     assert targets_p.shape[1] == 2
 
@@ -68,7 +96,15 @@ def optimize_bartlett(
     mirrors_p = mirrors_p - mean_mirror
     targets_p = targets_p - mean_target
 
-    ring_numbers = np.array([m.ring_number for m in mirror_faces])
+    if partition_by == "ring":
+        mirror_radius = np.array([m.ring_number for m in mirror_faces])
+    elif partition_by == "radius":
+        n_partitions = 7
+        mirror_radius = np.linalg.norm(targets_p, axis=1)
+        mirror_radius = mirror_radius / np.max(mirror_radius)
+        mirror_radius = np.round(mirror_radius * n_partitions).astype(int)
+    else:
+        raise ValueError()
 
     # Compute statistics
     mirror_azimuth = np.arctan2(mirrors_p[:, 1], mirrors_p[:, 0]) * 180 / np.pi
@@ -81,8 +117,8 @@ def optimize_bartlett(
     mirror_order = []
     target_order = []
 
-    for ring in np.sort(np.unique(ring_numbers)):
-        n_in_ring = np.sum(ring_numbers == ring)
+    for ring in np.sort(np.unique(mirror_radius)):
+        n_in_ring = np.sum(mirror_radius == ring)
 
         # Targets
         targets_in_ring = remaining_targets_sorted_by_radius[:n_in_ring]
@@ -93,7 +129,7 @@ def optimize_bartlett(
         target_order.extend(list(targets_in_ring_sorted_by_azimuth))
 
         # Mirrors
-        mirrors_in_ring = np.argwhere(ring_numbers == ring)[:, 0]
+        mirrors_in_ring = np.argwhere(mirror_radius == ring)[:, 0]
         mirrors_in_ring_sorted_by_azimuth = mirrors_in_ring[np.argsort(mirror_azimuth[mirrors_in_ring])]
 
         mirror_order.extend(list(mirrors_in_ring_sorted_by_azimuth))
@@ -140,7 +176,7 @@ def optimize_anneal(
             )
 
     losses = (
-            (1 / pairwise_distances_sqr + 1) *
+            (1 / (pairwise_distances_sqr + 1)) *
             (1 - cosine)
     )
     loss = np.sum(losses)
@@ -169,6 +205,39 @@ def optimize_anneal(
                 (1 - cosine)
         )
         print(np.sum(losses))
+
+    return best_order
+
+# @numba.jit(nopython=True)
+def tune_order(
+        guessed_order,
+        mirrors_3,
+        targets_3,
+        n_iter=1000,
+):
+    order = guessed_order
+    N = len(order)
+
+    best_order = np.copy(order)
+    best_loss = loss(mirrors_3, targets_3[order, :])
+
+    for i in range(n_iter):
+        swap1 = np.random.randint(0, N - 1)
+        swap2 = np.random.randint(0, N - 1)
+        while swap2 == swap1:
+            swap2 = np.random.randint(0, N - 1)
+
+        temp = order[swap2]
+        order[swap2] = order[swap1]
+        order[swap1] = temp
+
+        this_loss = loss(mirrors_3, targets_3[order, :])
+        if this_loss < best_loss:
+            best_order = np.copy(order)
+            best_loss = this_loss
+            print(i, this_loss)
+        else:
+            order = np.copy(best_order)
 
     return best_order
 

@@ -132,9 +132,11 @@ print("Optimizing mirror-target matching...")
 
 # best_order = optimize_none(N)
 # best_order = optimize_naive(mirrors_3, targets_3, n_iter=10 ** 4)
-best_order = optimize_bartlett(mirror_faces, mirrors_p, targets_p)
-assert len(best_order) == len(np.unique(best_order))
+best_order = optimize_bartlett(mirror_faces, mirrors_p, targets_p, partition_by="ring")
 
+tune_order(best_order, mirrors_3, targets_3, n_iter=100000)
+
+assert len(best_order) == len(np.unique(best_order))
 print("Optimized.")
 
 targets_3 = targets_3[best_order]
@@ -303,7 +305,7 @@ for i in range(N):
     plotter.add_mesh(
         pv.Spline(
             points=np.array([
-                mirrors_3[i,:],
+                mirrors_3[i, :],
                 actual_target
             ]),
             n_points=2
