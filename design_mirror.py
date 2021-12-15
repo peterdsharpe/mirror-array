@@ -1,4 +1,4 @@
-import numpy as np
+import aerosandbox.numpy as np
 import pyvista as pv
 from utilities.vector import normalize
 from utilities.coordinate_math import Plane, angle_axis_from_vectors
@@ -19,8 +19,8 @@ Units in inches.
 
 ### Inputs
 # Source properties
-source_location = np.array([
-    30 * 12, 0, 5 * 12
+source_location = 15 * 12 * np.array([
+    np.cosd(10), 0, np.sind(10)
 ])
 
 # Mirror properties
@@ -34,20 +34,18 @@ bevel_height = 1.5 / 25.4
 N = 6 * size ** 2  # The total number of triangles there will be
 
 # Target properties
-# target_message = "You are\nmy light"
 target_message = "marta\nyou are\nmy light"
-# target_message = "Ti amo\nMarta"
-target_scale = 8
+target_scale = 8  # How many units tall should each letter be on the target plane?
 
 target_plane = Plane(
-    origin_3=np.array([36, 0, -40]),
+    origin_3=np.array([36, 0, -41.5]),
     normal_3=np.array([0, 0, 1]),
     x_hat_3=np.array([0, -1, 0])
 )
 
-actual_source_location = np.array([1e6, 0, 0.1e6])
+actual_source_location = 1e6 * 12 * normalize(source_location)
 actual_focal_plane = Plane(
-    origin_3=np.array([36, 0, -40]),
+    origin_3=np.array([36, 0, -41.5]),
     normal_3=np.array([0, 0, 1]),
 )
 
@@ -60,22 +58,22 @@ targets_p = target_scale * get_points_from_string(
 )
 print("Targets generated.")
 targets_3 = target_plane.to_3D(targets_p)
-mean_target = np.mean(targets_3, axis=0)
-mean_mirror = np.array([0, 0, 0])
-mirror_to_source = normalize(source_location - mean_mirror)
-mirror_to_target = normalize(mean_target - mean_mirror)
+center_of_targets = target_plane.to_3D(np.array([[0, 0]]))[0, :]
+center_of_mirrors = np.array([0, 0, 0])
+mirror_to_source = normalize(source_location - center_of_mirrors)
+mirror_to_target = normalize(center_of_targets - center_of_mirrors)
 mirror_plane_normal = normalize(mirror_to_source + mirror_to_target)
 
 ### Compute locations of mirrors
 
 
 mirror_plane = Plane(
-    origin_3=mean_mirror,
+    origin_3=center_of_mirrors,
     normal_3=mirror_plane_normal,
     x_hat_3=np.array([0, 1, 0])
 )
 
-mirrors: List[pv.PolyData] = []
+mirror_faces: List[pv.PolyData] = []
 
 rt3 = np.sqrt(3)
 for ring_number in np.arange(size) + 1:
@@ -113,14 +111,14 @@ for ring_number in np.arange(size) + 1:
             tri.side = side
             tri.stride = stride
 
-            mirrors.append(tri)
+            mirror_faces.append(tri)
 
-assert N == len(mirrors)
+assert N == len(mirror_faces)
 
 mirrors_3 = np.stack(  # The locations of the centers of the mirrors.
     [
         mirror.center_of_mass()
-        for mirror in mirrors
+        for mirror in mirror_faces
     ],
     axis=0
 )  # shape: (tri_id, axis_id)
@@ -134,7 +132,7 @@ print("Optimizing mirror-target matching...")
 
 # best_order = optimize_none(N)
 # best_order = optimize_naive(mirrors_3, targets_3, n_iter=10 ** 4)
-best_order = optimize_bartlett(mirrors, mirrors_p, targets_p)
+best_order = optimize_bartlett(mirror_faces, mirrors_p, targets_p)
 assert len(best_order) == len(np.unique(best_order))
 
 print("Optimized.")
@@ -162,11 +160,10 @@ def rotate_mirror_to_normal(mirror, normal_3):
     return mirror
 
 
-mirrors = [
+mirror_faces = [
     rotate_mirror_to_normal(mirror, normal)
-    for mirror, normal in zip(mirrors, mirror_normals_3)
+    for mirror, normal in zip(mirror_faces, mirror_normals_3)
 ]
-mirror_faces = copy.deepcopy(mirrors)
 
 
 # Add in bevels
@@ -187,15 +184,16 @@ def make_bevel(
         ]
     )
     bevel = bevel.extrude(vector=bevel_height * mirror_plane.normal_3, capping=True)
+    bevel.points_to_double()
     return bevel
 
 
 bevels = [
              make_bevel(mirror, far_corner_id=1)
-             for mirror in mirrors
+             for mirror in mirror_faces
          ] + [
              make_bevel(mirror, far_corner_id=2)
-             for mirror in mirrors
+             for mirror in mirror_faces
          ]
 
 # Extrude the mirrors
@@ -210,28 +208,40 @@ depth = np.dot(
     mirror_plane.normal_3
 ).max()
 
-mirrors = [
+mirror_solids = [
     mirror.extrude(vector=-3 * depth * mirror_plane.normal_3, capping=True)
-    for mirror in mirrors
+    for mirror in mirror_faces
 ]
+for m in mirror_solids:
+    m.points_to_double()
 
 # Make the base
 base = pv.Polygon(
     center=[0, 0, 0],
     normal=[0, 0, 1],
-    radius=size * (side_length + spacing * rt3) + spacing * 2 / rt3,
+    radius=1,
     n_sides=6
 )
+base.points = np.array([
+    [0, 1, 0],
+    [rt3 / 2, 0.5, 0],
+    [rt3 / 2, -0.5, 0],
+    [0, -1, 0],
+    [-rt3 / 2, -0.5, 0],
+    [-rt3 / 2, 0.5, 0]
+])
 base.rotate_z(30)
+base.scale(size * (side_length + spacing * rt3) + spacing * 2 / rt3)
 base.points = mirror_plane.to_3D(
     base.points[:, :2]
 )
 
 base.translate(-depth * mirror_plane.normal_3)
 base = base.extrude(vector=-3 * depth * mirror_plane.normal_3, capping=True)
+base.points_to_double()
 
 # Merge everything
-things = [base] + mirrors + bevels
+things = [base] + mirror_solids + bevels
 things = [
     thing.triangulate()
     for thing in things
@@ -240,14 +250,17 @@ things = [
 model = pv.PolyData().merge(things)
 
 ### Export print
+print("Generating, partitioning, and writing print files...")
 model_mm = copy.deepcopy(model)
+
 angle, axis = angle_axis_from_vectors(
     mirror_plane.normal_3,
     [0, 0, 1]
 )
 model_mm.rotate_vector(axis, angle * 180 / np.pi, point=mirror_plane.origin_3)
 model_mm.scale(25.4)
-print("Writing print files...")
+
+# model_mm.plot(show_grid=True)
 model_mm.save("to_print/print.stl")
 print("Written.")
 
@@ -255,19 +268,15 @@ print("Written.")
 plotter = pv.Plotter(lighting="three lights")
 
 plotter.add_mesh(model)
-# for mirror in mirrors:  # Draw the mirrors
-#     plotter.add_mesh(mirror)
-#
+
 for face in mirror_faces:
     plotter.add_mesh(face, color=np.array([242, 222, 197]) / 255)
-#
-# plotter.add_mesh(base)
-#
-# for bevel in bevels:
-#     plotter.add_mesh(bevel, color="red")
 
 plotter.add_points(  # Draw the intended targets
-    targets_3, color=0.2 * np.ones(3)
+    targets_3,
+    color=0 * np.ones(3),
+    point_size=5,
+    opacity=0.8
 )
 
 # Draw optics and actual targets
@@ -283,15 +292,30 @@ for i in range(N):
     )
 
     ### Draw line to target
-    plotter.add_lines(
-        lines=np.array([
-            mirrors_3[i, :],
-            actual_target
-        ]),
-        color=0.2 * np.ones(3),
-        width=0.5
+    # plotter.add_lines(
+    #     lines=np.array([
+    #         mirrors_3[i, :],
+    #         actual_target
+    #     ]),
+    #     color=0.2 * np.ones(3),
+    #     width=0.5,
+    # )
+    plotter.add_mesh(
+        pv.Spline(
+            points=np.array([
+                mirrors_3[i,:],
+                actual_target
+            ]),
+            n_points=2
+        ),
+        opacity=0.3
     )
-    plotter.add_points(points=actual_target)
+    plotter.add_points(
+        actual_target,
+        color=1 * np.ones(3),
+        point_size=5,
+        opacity=0.8,
+    )
 
 # plotter.add_mesh(
 #     pv.Sphere(radius=1, center=source_location),

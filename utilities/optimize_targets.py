@@ -56,7 +56,7 @@ def optimize_naive(
 
 
 def optimize_bartlett(
-        mirrors,
+        mirror_faces,
         mirrors_p,
         targets_p,
 ):
@@ -68,9 +68,7 @@ def optimize_bartlett(
     mirrors_p = mirrors_p - mean_mirror
     targets_p = targets_p - mean_target
 
-    id = np.arange(len(mirrors_p))
-
-    ring_numbers = np.array([m.ring_number for m in mirrors])
+    ring_numbers = np.array([m.ring_number for m in mirror_faces])
 
     # Compute statistics
     mirror_azimuth = np.arctan2(mirrors_p[:, 1], mirrors_p[:, 0]) * 180 / np.pi
@@ -79,7 +77,6 @@ def optimize_bartlett(
     target_radius = np.linalg.norm(targets_p, axis=1)
 
     # Assign targets
-    remaining_mirrors_sorted_by_ring = np.argsort(ring_numbers)
     remaining_targets_sorted_by_radius = np.argsort(target_radius)
     mirror_order = []
     target_order = []
@@ -96,7 +93,7 @@ def optimize_bartlett(
         target_order.extend(list(targets_in_ring_sorted_by_azimuth))
 
         # Mirrors
-        mirrors_in_ring = np.argwhere(ring_numbers == ring)[:,0]
+        mirrors_in_ring = np.argwhere(ring_numbers == ring)[:, 0]
         mirrors_in_ring_sorted_by_azimuth = mirrors_in_ring[np.argsort(mirror_azimuth[mirrors_in_ring])]
 
         mirror_order.extend(list(mirrors_in_ring_sorted_by_azimuth))
@@ -104,7 +101,6 @@ def optimize_bartlett(
     mirror_order = np.array(mirror_order)
     target_order = np.array(target_order)
 
-    # order = mirror_order[target_order]
     order = np.arange(len(mirror_order))
     order[mirror_order] = target_order
 
