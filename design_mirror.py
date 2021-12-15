@@ -20,7 +20,7 @@ Units in inches.
 ### Inputs
 # Source properties
 source_location = np.array([
-    1e6, 0, 0
+    30 * 12, 0, 5 * 12
 ])
 
 # Mirror properties
@@ -34,17 +34,21 @@ bevel_height = 1.5 / 25.4
 N = 6 * size ** 2  # The total number of triangles there will be
 
 # Target properties
-target_message = "Marta\nyou are my\nlight"
-target_scale = 5
+# target_message = "You are\nmy light"
+target_message = "marta\nyou are\nmy light"
+# target_message = "Ti amo\nMarta"
+target_scale = 8
 
 target_plane = Plane(
-    origin_3=np.array([36, 0, -36]),
+    origin_3=np.array([36, 0, -40]),
     normal_3=np.array([0, 0, 1]),
     x_hat_3=np.array([0, -1, 0])
 )
-focal_plane = Plane(
-    origin_3=np.array([36, 0, -48]),
-    normal_3=target_plane.normal_3,
+
+actual_source_location = np.array([1e6, 0, 0.1e6])
+actual_focal_plane = Plane(
+    origin_3=np.array([36, 0, -40]),
+    normal_3=np.array([0, 0, 1]),
 )
 
 ### Setup
@@ -52,6 +56,7 @@ print("Generating targets...")
 targets_p = target_scale * get_points_from_string(
     s=target_message,
     n_points=N,
+    kerning=1.5
 )
 print("Targets generated.")
 targets_3 = target_plane.to_3D(targets_p)
@@ -104,6 +109,10 @@ for ring_number in np.arange(size) + 1:
             if np.dot(tri.face_normals[0, :], source_location - tri.center_of_mass()) < 0:
                 tri.flip_normals()
 
+            tri.ring_number = ring_number
+            tri.side = side
+            tri.stride = stride
+
             mirrors.append(tri)
 
 assert N == len(mirrors)
@@ -122,9 +131,12 @@ mirrors_p = mirror_plane.to_p(mirrors_3)
 from utilities.optimize_targets import *
 
 print("Optimizing mirror-target matching...")
-best_order = optimize_bartlett(
-    mirrors_3, targets_3
-)
+
+# best_order = optimize_none(N)
+# best_order = optimize_naive(mirrors_3, targets_3, n_iter=10 ** 4)
+best_order = optimize_bartlett(mirrors, mirrors_p, targets_p)
+assert len(best_order) == len(np.unique(best_order))
+
 print("Optimized.")
 
 targets_3 = targets_3[best_order]
@@ -146,7 +158,7 @@ def rotate_mirror_to_normal(mirror, normal_3):
         normal_3,
     )
     mirror.rotate_vector(vector=axis, angle=180 / np.pi * angle, point=mirror.center_of_mass())
-    assert np.allclose(mirror.face_normals[0, :], normal_3, atol=1e-5, rtol=1e-5)
+    assert np.allclose(mirror.face_normals[0, :], normal_3, atol=1e-4, rtol=1e-4)
     return mirror
 
 
@@ -262,10 +274,10 @@ plotter.add_points(  # Draw the intended targets
 for i in range(N):
     ### Compute *actual* optics
     actual_normal = mirror_normals_3[i, :]
-    actual_source_to_mirror = normalize(mirrors_3[i, :] - source_location)
+    actual_source_to_mirror = normalize(mirrors_3[i, :] - actual_source_location)
     actual_outgoing_ray_direction = normalize(
         actual_source_to_mirror - 2 * np.dot(actual_source_to_mirror, actual_normal) * actual_normal)
-    actual_target = focal_plane.intersection_with_line_3(
+    actual_target = actual_focal_plane.intersection_with_line_3(
         line_origin_3=mirrors_3[i, :],
         line_direction_3=actual_outgoing_ray_direction,
     )
@@ -277,7 +289,7 @@ for i in range(N):
             actual_target
         ]),
         color=0.2 * np.ones(3),
-        width=0.2
+        width=0.5
     )
     plotter.add_points(points=actual_target)
 
@@ -287,6 +299,8 @@ for i in range(N):
 # )
 
 plotter.add_axes()
-# plotter.show_grid()
+plotter.show_grid()
 plotter.title = "Mirror for Marta"
+plotter.camera_position = 'xy'
+plotter.camera.roll = 90
 plotter.show()

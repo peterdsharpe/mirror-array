@@ -2,7 +2,6 @@ from utilities.vector import normalize
 import numpy as np
 from scipy import spatial
 import copy
-import numba
 
 
 def loss(
@@ -28,16 +27,14 @@ def loss(
     )
 
 
-def optimize_none(
-        mirrors_3,
-        targets_3,
-):
-    return np.arange(len(mirrors_3))
+def optimize_none(N):
+    return np.arange(N)
 
 
 def optimize_naive(
         mirrors_3,
         targets_3,
+        n_iter: int,
 ):
     order = np.arange(len(mirrors_3))
 
@@ -59,11 +56,59 @@ def optimize_naive(
 
 
 def optimize_bartlett(
-        mirrors_3,
-        targets_3,
+        mirrors,
+        mirrors_p,
+        targets_p,
 ):
-    mean_target = np.mean(targets_3, axis=0)
+    assert targets_p.shape[1] == 2
 
+    mean_mirror = np.mean(mirrors_p, axis=0)
+    mean_target = np.mean(targets_p, axis=0)
+
+    mirrors_p = mirrors_p - mean_mirror
+    targets_p = targets_p - mean_target
+
+    id = np.arange(len(mirrors_p))
+
+    ring_numbers = np.array([m.ring_number for m in mirrors])
+
+    # Compute statistics
+    mirror_azimuth = np.arctan2(mirrors_p[:, 1], mirrors_p[:, 0]) * 180 / np.pi
+    target_azimuth = np.arctan2(targets_p[:, 1], -targets_p[:, 0]) * 180 / np.pi
+
+    target_radius = np.linalg.norm(targets_p, axis=1)
+
+    # Assign targets
+    remaining_mirrors_sorted_by_ring = np.argsort(ring_numbers)
+    remaining_targets_sorted_by_radius = np.argsort(target_radius)
+    mirror_order = []
+    target_order = []
+
+    for ring in np.sort(np.unique(ring_numbers)):
+        n_in_ring = np.sum(ring_numbers == ring)
+
+        # Targets
+        targets_in_ring = remaining_targets_sorted_by_radius[:n_in_ring]
+        remaining_targets_sorted_by_radius = remaining_targets_sorted_by_radius[n_in_ring:]
+
+        targets_in_ring_sorted_by_azimuth = targets_in_ring[np.argsort(target_azimuth[targets_in_ring])]
+
+        target_order.extend(list(targets_in_ring_sorted_by_azimuth))
+
+        # Mirrors
+        mirrors_in_ring = np.argwhere(ring_numbers == ring)[:,0]
+        mirrors_in_ring_sorted_by_azimuth = mirrors_in_ring[np.argsort(mirror_azimuth[mirrors_in_ring])]
+
+        mirror_order.extend(list(mirrors_in_ring_sorted_by_azimuth))
+
+    mirror_order = np.array(mirror_order)
+    target_order = np.array(target_order)
+
+    # order = mirror_order[target_order]
+    order = np.arange(len(mirror_order))
+    order[mirror_order] = target_order
+
+    return order
 
 
 def optimize_anneal(

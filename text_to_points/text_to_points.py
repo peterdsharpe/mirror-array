@@ -43,7 +43,7 @@ import matplotlib.pyplot as plt
 import aerosandbox.tools.pretty_plots as p
 
 
-def get_points_from_string(s: str = "Testing", n_points=200, line_spacing=1.5):
+def get_points_from_string(s: str = "Testing", n_points=200, line_spacing=1.5, kerning=1):
     # Clean up string
     s = "\n".join([line.strip() for line in s.split("\n")])  # strip spaces off each line
     admissible_characters = alphabet_characters + "\n" + " "
@@ -58,7 +58,7 @@ def get_points_from_string(s: str = "Testing", n_points=200, line_spacing=1.5):
         assert "\n" not in s_line
         length = 0
         for l in s_line:
-            length += letter_spacings[l]
+            length += letter_spacings[l] * kerning
         return length
 
     # Compute all subpaths of letters, and where they should be
@@ -75,7 +75,7 @@ def get_points_from_string(s: str = "Testing", n_points=200, line_spacing=1.5):
                 subpaths.extend(sp)
                 sp_offsets.extend(len(sp) * [line_origin + current_offset_on_line])
 
-            current_offset_on_line += letter_spacings[l]
+            current_offset_on_line += letter_spacings[l] * kerning
 
     # Compute how many points each subpath gets
     sp_lengths = np.array([
@@ -91,7 +91,8 @@ def get_points_from_string(s: str = "Testing", n_points=200, line_spacing=1.5):
     points = []
 
     for sp, length, offset, sp_n in zip(subpaths, sp_lengths, sp_offsets, sp_n_points):
-        lengths_nondim = np.linspace(0, 1, sp_n) * length
+
+        lengths_nondim = np.linspace(0, 1, sp_n, endpoint=not sp.isclosed()) * length
         t = np.array([sp.ilength(l) for l in lengths_nondim])
         points_complex = np.array([sp.point(ti) for ti in t])
         # Scale
@@ -117,14 +118,15 @@ def get_points_from_string(s: str = "Testing", n_points=200, line_spacing=1.5):
 
 if __name__ == '__main__':
     fig, ax = plt.subplots()
-    s = "Marta you are\nmy sunshine"
-    n_points = 294
+    s = "H"#"Marta you are\nmy sunshine"
+    n_points = 20
     c = get_points_from_string(s, n_points)
     plt.plot(
         c[:, 0],
         c[:, 1],
         ".",
-        markersize=3,
+        markersize=20,
+        alpha=0.3
     )
     p.equal()
     p.show_plot()
