@@ -50,6 +50,13 @@ actual_focal_plane = Plane(
     normal_3=np.array([0, 0, 1]),
 )
 
+# Optimizer parameters
+use_cached_solution = False
+temp_start_rel = 1
+temp_end_rel = 1e-7
+n_iter = 3e6
+verbose = False
+
 ### Setup
 print("Generating targets...")
 targets_p = target_scale * get_points_from_string(
@@ -129,12 +136,22 @@ mirrors_3 = np.stack(  # The locations of the centers of the mirrors.
 
 from utilities.optimize_targets import *
 
-print("Optimizing mirror-target matching...")
-
-best_mirror_reordering = optimize_anneal(mirrors_3, targets_3)
-
-assert len(best_mirror_reordering) == len(np.unique(best_mirror_reordering))
-print("Optimized.")
+if use_cached_solution:
+    print("Using cached mirror-target matching.")
+    best_mirror_reordering = np.load("cache/mirror_order.npy")
+else:
+    print("Optimizing mirror-target matching...")
+    best_mirror_reordering = optimize_anneal(
+        mirrors_3=mirrors_3,
+        targets_3=targets_3,
+        temp_start_rel=temp_start_rel,
+        temp_end_rel=temp_end_rel,
+        n_iter=n_iter,
+        verbose=verbose
+    )
+    assert len(best_mirror_reordering) == len(np.unique(best_mirror_reordering))
+    print("Optimized.")
+    np.save("cache/mirror_order.npy", best_mirror_reordering)
 
 mirror_faces = mirror_faces[best_mirror_reordering]
 mirrors_3 = mirrors_3[best_mirror_reordering]
