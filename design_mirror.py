@@ -5,6 +5,7 @@ from utilities.coordinate_math import Plane, angle_axis_from_vectors
 from utilities.reflection_math import compute_orientations
 from typing import List
 from text_to_points.text_to_points import get_points_from_string
+import copy
 
 """
 Notes:
@@ -115,6 +116,7 @@ for ring_number in np.arange(size) + 1:
 
 assert N == len(mirror_faces)
 
+mirror_faces = np.array(mirror_faces)
 mirrors_3 = np.stack(  # The locations of the centers of the mirrors.
     [
         mirror.center_of_mass()
@@ -122,7 +124,6 @@ mirrors_3 = np.stack(  # The locations of the centers of the mirrors.
     ],
     axis=0
 )  # shape: (tri_id, axis_id)
-mirrors_p = mirror_plane.to_p(mirrors_3)
 
 ### Assign targets
 
@@ -130,16 +131,13 @@ from utilities.optimize_targets import *
 
 print("Optimizing mirror-target matching...")
 
-best_order = optimize_none(N)
-# best_order = optimize_naive(mirrors_3, targets_3, n_iter=10 ** 4)
-# best_order = optimize_bartlett(mirror_faces, mirrors_p, targets_p, partition_by="ring")
+best_mirror_reordering = optimize_anneal(mirrors_3, targets_3)
 
-best_order = optimize_anneal(best_order, mirrors_3, targets_3, n_iter=100000)
-
-assert len(best_order) == len(np.unique(best_order))
+assert len(best_mirror_reordering) == len(np.unique(best_mirror_reordering))
 print("Optimized.")
 
-targets_3 = targets_3[best_order]
+mirror_faces = mirror_faces[best_mirror_reordering]
+mirrors_3 = mirrors_3[best_mirror_reordering]
 
 ### Compute orientations
 mirror_normals_3 = compute_orientations(
