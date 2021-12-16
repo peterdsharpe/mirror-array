@@ -54,7 +54,7 @@ actual_focal_plane = Plane(
 use_cached_solution = True
 temp_start_rel = 1
 temp_end_rel = 1e-8
-n_iter = 4.3e9  # Note: Asymptotic runtime of ~220,000 iterations/second on my machine.
+n_iter = 220e3 * 3600 * 6  # Note: Asymptotic runtime of ~220,000 iterations/second on my machine.
 verbose = False
 
 ### Setup
@@ -62,7 +62,7 @@ print("Generating targets...")
 targets_p = target_scale * get_points_from_string(
     s=target_message,
     n_points=N,
-    kerning=1.5
+    kerning=1.2
 )
 print("Targets generated.")
 targets_3 = target_plane.to_3D(targets_p)
