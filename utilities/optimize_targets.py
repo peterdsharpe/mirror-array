@@ -19,8 +19,8 @@ def optimize_anneal(
     ### Setup
     N = len(mirrors_3)
     current_mirror_order = np.arange(N)
-    np.random.shuffle(current_mirror_order)
-    # current_mirror_order[0] == the id of the mirror that the first target should match with
+    np.random.shuffle(current_mirror_order)  # Start in a random order
+    # Note: current_mirror_order[0] == the id of the mirror that the first target should match with
 
     ### Setup loss calculation, and perform the first one as a baseline.
     target_distance_factor = np.zeros((N, N))
@@ -32,6 +32,7 @@ def optimize_anneal(
                 targets_3[i, :],
                 targets_3[j, :]
             )
+            ### Different possible distance factors
             # target_distance_factor[i, j] = 1 / (dist + distance_radius)  # power law
             # target_distance_factor[i, j] = 1 / (dist ** 2 + distance_radius)  # power law
             target_distance_factor[i, j] = np.exp(-dist / distance_radius)  # Exponential
@@ -41,6 +42,7 @@ def optimize_anneal(
     current_ray_directions = normalize_2D_jit(mirrors_3[current_mirror_order, :] - targets_3)
 
     def misalignment_function(ray1, ray2):
+        """Computes the misalignment of two vectors which are assumed to already be normalized."""
         return 1 - dot_jit(ray1, ray2)  # Cosine distance
         # return dist_jit(ray1, ray2)  # Euclidian distance
 
