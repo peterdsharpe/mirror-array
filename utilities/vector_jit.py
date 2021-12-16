@@ -2,7 +2,7 @@ import numpy as np
 import numba
 
 
-@numba.njit(fastmath=True)
+@numba.njit()
 def normalize_1D_jit(v):
     norm = np.sqrt(
         v[0] ** 2 +
@@ -12,7 +12,7 @@ def normalize_1D_jit(v):
     return v / norm
 
 
-@numba.njit(fastmath=True)
+@numba.njit()
 def normalize_2D_jit(v):
     norms = np.sqrt(
         v[:, 0] ** 2 +
@@ -23,7 +23,7 @@ def normalize_2D_jit(v):
     return v / norms
 
 
-@numba.njit(fastmath=True)
+@numba.njit()
 def dot_jit(a, b):
     return (
             a[0] * b[0] +
@@ -32,7 +32,7 @@ def dot_jit(a, b):
     )
 
 
-@numba.njit(fastmath=True)
+@numba.njit()
 def dist_jit(a, b):
     return (
                    (a[0] - b[0]) ** 2 +
