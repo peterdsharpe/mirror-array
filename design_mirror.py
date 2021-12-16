@@ -43,18 +43,18 @@ target_plane = Plane(
     normal_3=np.array([0, 0, 1]),
     x_hat_3=np.array([0, -1, 0])
 )
-
-actual_source_location = 1e6 * 12 * normalize(source_location)
+actual_source_location = np.copy(source_location) * 1e6
+# actual_source_location = 15 * 12 * normalize(source_location)
 actual_focal_plane = Plane(
     origin_3=np.array([36, 0, -41.5]),
     normal_3=np.array([0, 0, 1]),
 )
 
 # Optimizer parameters
-use_cached_solution = False
+use_cached_solution = True
 temp_start_rel = 1
-temp_end_rel = 1e-7
-n_iter = 3e6
+temp_end_rel = 1e-8
+n_iter = 4.3e9  # Note: Asymptotic runtime of ~220,000 iterations/second on my machine.
 verbose = False
 
 ### Setup
@@ -134,13 +134,16 @@ mirrors_3 = np.stack(  # The locations of the centers of the mirrors.
 
 ### Assign targets
 
-from utilities.optimize_targets import *
 
 if use_cached_solution:
     print("Using cached mirror-target matching.")
-    best_mirror_reordering = np.load("cache/mirror_order.npy")
+    best_mirror_reordering = np.loadtxt("cache/mirror_order.txt", dtype=int)
 else:
     print("Optimizing mirror-target matching...")
+    from utilities.optimize_targets import *
+    import time
+
+    start = time.perf_counter()
     best_mirror_reordering = optimize_anneal(
         mirrors_3=mirrors_3,
         targets_3=targets_3,
@@ -149,9 +152,10 @@ else:
         n_iter=n_iter,
         verbose=verbose
     )
+    end = time.perf_counter()
     assert len(best_mirror_reordering) == len(np.unique(best_mirror_reordering))
-    print("Optimized.")
-    np.save("cache/mirror_order.npy", best_mirror_reordering)
+    print(f"Optimized in {end - start} seconds.")
+    np.savetxt("cache/mirror_order.txt", best_mirror_reordering, fmt='%i')
 
 mirror_faces = mirror_faces[best_mirror_reordering]
 mirrors_3 = mirrors_3[best_mirror_reordering]
@@ -293,7 +297,7 @@ plotter.add_points(  # Draw the intended targets
     targets_3,
     color=0 * np.ones(3),
     point_size=5,
-    opacity=0.8
+    opacity=0.5
 )
 
 # Draw optics and actual targets
@@ -331,7 +335,7 @@ for i in range(N):
         actual_target,
         color=1 * np.ones(3),
         point_size=5,
-        opacity=0.8,
+        opacity=1,
     )
 
 # plotter.add_mesh(

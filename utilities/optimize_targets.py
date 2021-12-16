@@ -152,6 +152,7 @@ def optimize_anneal(
                 else:
                     current_losses[swap2, i] = swap2_losses_new[i]
 
+            # current_loss = current_loss + delta_loss # TODO why does this not do the same as below?
             current_loss = 0
             for i in range(N):
                 for j in range(i + 1, N):
