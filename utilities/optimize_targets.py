@@ -33,14 +33,16 @@ def optimize_anneal(
             # target_distance_factor[i, j] = 1 if dist < distance_radius else 1e-3
 
     current_ray_directions = normalize_2D_jit(mirrors_3[current_mirror_order, :] - targets_3)
+    def misalignment_function(ray1, ray2):
+        return 1 - dot_jit(ray1, ray2)
+
     current_misalignment_factor = np.zeros((N, N))
     for i in range(N):
         for j in range(i + 1, N):
-            cos = dot_jit(
-                current_ray_directions[i, :],
-                current_ray_directions[j, :]
+            current_misalignment_factor[i, j] = misalignment_function(
+                current_ray_directions[i,:],
+                current_ray_directions[j,:],
             )
-            current_misalignment_factor[i, j] = 1 - cos
 
     current_losses = np.zeros((N, N))
     for i in range(N):
@@ -87,11 +89,10 @@ def optimize_anneal(
             if i == swap1:
                 continue
             ### Compute misalignment factor
-            cos = dot_jit(
+            new_misalignment_factor = misalignment_function(
                 current_ray_directions[i, :],
                 swap1_ray_new
             )
-            new_misalignment_factor = 1 - cos
 
             ### Compute loss
             swap1_losses_new[i] = target_distance_factor[swap1, i] * new_misalignment_factor
@@ -103,11 +104,10 @@ def optimize_anneal(
             if i == swap2:
                 continue
             ### Compute misalignment factor
-            cos = dot_jit(
+            new_misalignment_factor = misalignment_function(
                 current_ray_directions[i, :],
                 swap2_ray_new
             )
-            new_misalignment_factor = 1 - cos
 
             ### Compute loss
             swap2_losses_new[i] = target_distance_factor[swap2, i] * new_misalignment_factor
