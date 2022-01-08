@@ -29,7 +29,7 @@ size = 7  # How many triangle-edges from the center of the big mirror to the out
 mirror_side_length = 1  # What's the side length of the triangles?
 bevel_width = 1.5 / 25.4
 side_length = mirror_side_length + bevel_width
-spacing = 1.5 / 25.4  # What's the gap between adjacent triangles?
+gap_width = 1.5 / 25.4  # What's the gap between adjacent triangles?
 bevel_height = 1.5 / 25.4
 
 N = 6 * size ** 2  # The total number of triangles there will be
@@ -43,10 +43,10 @@ target_plane = Plane(
     normal_3=np.array([0, 0, 1]),
     x_hat_3=np.array([0, -1, 0])
 )
-actual_source_location = np.copy(source_location) * 1e6
+actual_source_location = np.copy(source_location)
 # actual_source_location = 15 * 12 * normalize(source_location)
 actual_focal_plane = Plane(
-    origin_3=np.array([36, 0, -41.5]),
+    origin_3=np.array([36, 0, -41.5]) * 2,
     normal_3=np.array([0, 0, 1]),
 )
 
@@ -62,7 +62,7 @@ print("Generating targets...")
 targets_p = target_scale * get_points_from_string(
     s=target_message,
     n_points=N,
-    kerning=1.5
+    kerning=1.2
 )
 print("Targets generated.")
 targets_3 = target_plane.to_3D(targets_p)
@@ -103,11 +103,11 @@ for ring_number in np.arange(size) + 1:
 
             tri.rotate_z(60 * side)
 
-            tri.scale(side_length + spacing * rt3)
+            tri.scale(side_length + gap_width * rt3)
 
             center = tri.center_of_mass()
             tri.translate(-center)
-            tri.scale(side_length / (side_length + spacing * rt3))
+            tri.scale(side_length / (side_length + gap_width * rt3))
             tri.translate(center)
 
             tri.points = mirror_plane.to_3D(tri.points[:, :2])
@@ -209,13 +209,10 @@ def make_bevel(
     return bevel
 
 
-bevels = [
-             make_bevel(mirror, far_corner_id=1)
-             for mirror in mirror_faces
-         ] + [
-             make_bevel(mirror, far_corner_id=2)
-             for mirror in mirror_faces
-         ]
+bevels = []
+for far_corner_id in [1, 2]:
+    for mirror in mirror_faces:
+        bevels.append(make_bevel(mirror, far_corner_id))
 
 # Extrude the mirrors
 mirror_corners_3 = np.concatenate(
@@ -252,7 +249,7 @@ base.points = np.array([
     [-rt3 / 2, 0.5, 0]
 ])
 base.rotate_z(30)
-base.scale(size * (side_length + spacing * rt3) + spacing * 2 / rt3)
+base.scale(size * (side_length + gap_width * rt3) + gap_width * 2 / rt3)
 base.points = mirror_plane.to_3D(
     base.points[:, :2]
 )
@@ -281,17 +278,25 @@ angle, axis = angle_axis_from_vectors(
 model_mm.rotate_vector(axis, angle * 180 / np.pi, point=mirror_plane.origin_3)
 model_mm.scale(25.4)
 
-# model_mm.plot(show_grid=True)
 model_mm.save("to_print/print.stl")
+# model_mm.plot(show_grid=True)
 print("Written.")
 
 ### Draw everything
-plotter = pv.Plotter(lighting="three lights")
+plotter = pv.Plotter()
+plotter.add_light(pv.Light(
+    position=actual_source_location, focal_point=mirror_plane.origin_3
+))
 
-plotter.add_mesh(model)
+plotter.add_mesh(model, pbr=False)
 
 for face in mirror_faces:
-    plotter.add_mesh(face, color=np.array([242, 222, 197]) / 255)
+    plotter.add_mesh(face,
+                     color=np.array([242, 222, 197]) / 255,
+                     pbr=True,
+                     # metallic=1,
+                     # roughness=0,
+                     )
 
 plotter.add_points(  # Draw the intended targets
     targets_3,
@@ -342,6 +347,8 @@ for i in range(N):
 #     pv.Sphere(radius=1, center=source_location),
 #     color="yellow"
 # )
+
+plotter.add_floor("-z")
 
 plotter.add_axes()
 plotter.show_grid()
