@@ -19,20 +19,21 @@ Units in inches.
 """
 
 ### Inputs
+debug = True
 # Source properties
 source_location = 15 * 12 * np.array([
     np.cosd(10), 0, np.sind(10)
 ])
 
 # Mirror properties
-size = 7  # How many triangle-edges from the center of the big mirror to the outside?
-mirror_side_length = 1  # What's the side length of the triangles?
-bevel_width = 1.5 / 25.4
-side_length = mirror_side_length + bevel_width
+n_rings = 7  # How many triangle-edges from the center of the big mirror to the outside?
+mirror_base_length = 24.65 / 25.4  # Note: assumed the mirrors are isoceles triangles, where "base" is the odd side length out.
+mirror_side_lengths = 27.38 / 25.4
+bevel_width = 0.8 / 25.4
 gap_width = 1.5 / 25.4  # What's the gap between adjacent triangles?
 bevel_height = 1.5 / 25.4
 
-N = 6 * size ** 2  # The total number of triangles there will be
+N = 6 * n_rings ** 2  # The total number of triangles there will be
 
 # Target properties
 target_message = "marta\nyou are\nmy light"
@@ -72,56 +73,26 @@ mirror_to_source = normalize(source_location - center_of_mirrors)
 mirror_to_target = normalize(center_of_targets - center_of_mirrors)
 mirror_plane_normal = normalize(mirror_to_source + mirror_to_target)
 
+### Compute mirror triangles
+mirror_height_length = (
+                               mirror_side_lengths ** 2 -
+                               (mirror_base_length / 2) ** 2
+                       ) ** 0.5
+
 ### Compute locations of mirrors
-
-
 mirror_plane = Plane(
     origin_3=center_of_mirrors,
     normal_3=mirror_plane_normal,
     x_hat_3=np.array([0, 1, 0])
 )
 
-mirror_faces: List[pv.PolyData] = []
+from utilities.mesh_hexagon import mesh_hexagon
 
-rt3 = np.sqrt(3)
-for ring_number in np.arange(size) + 1:
-    inside_radius = (ring_number - 1) * rt3 / 2
-    for side in np.arange(6):
-        for stride in np.arange(1 - ring_number, ring_number)[::-1]:
-            tri = pv.Triangle([
-                [0, 0.5 * rt3, 0],
-                [0.5, 0, 0],
-                [-0.5, 0, 0],
-            ])
-
-            if (ring_number + stride) % 2 == 1:
-                tri.flip_y()
-
-            tri.translate([0, inside_radius, 0])
-
-            tri.translate([stride / 2, 0, 0])
-
-            tri.rotate_z(60 * side)
-
-            tri.scale(side_length + gap_width * rt3)
-
-            center = tri.center_of_mass()
-            tri.translate(-center)
-            tri.scale(side_length / (side_length + gap_width * rt3))
-            tri.translate(center)
-
-            tri.points = mirror_plane.to_3D(tri.points[:, :2])
-
-            if np.dot(tri.face_normals[0, :], source_location - tri.center_of_mass()) < 0:
-                tri.flip_normals()
-
-            tri.ring_number = ring_number
-            tri.side = side
-            tri.stride = stride
-
-            mirror_faces.append(tri)
-
-assert N == len(mirror_faces)
+mirror_faces: List[pv.PolyData] = mesh_hexagon(
+    n_rings=n_rings,
+    plane=mirror_plane,
+    source_location=source_location
+)
 
 mirror_faces = np.array(mirror_faces)
 mirrors_3 = np.stack(  # The locations of the centers of the mirrors.
@@ -249,7 +220,7 @@ base.points = np.array([
     [-rt3 / 2, 0.5, 0]
 ])
 base.rotate_z(30)
-base.scale(size * (side_length + gap_width * rt3) + gap_width * 2 / rt3)
+base.scale(n_rings * (side_length + gap_width * rt3) + gap_width * 2 / rt3)
 base.points = mirror_plane.to_3D(
     base.points[:, :2]
 )
