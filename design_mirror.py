@@ -3,7 +3,7 @@ import pyvista as pv
 from utilities.vector import normalize
 from utilities.coordinate_math import Plane, angle_axis_from_vectors
 from utilities.reflection_math import compute_orientations
-from typing import List
+from typing import List, Dict
 from text_to_points.text_to_points import get_points_from_string
 import copy
 
@@ -102,23 +102,30 @@ mirror_plane = Plane(
 
 from utilities.mesh_hexagon import mesh_hexagon
 
-mirror_faces: List[pv.PolyData] = mesh_hexagon(
+bases: List[Dict[str, pv.PolyData]] = mesh_hexagon(
     n_rings=n_rings,
-    plane=mirror_plane,
-    source_location=source_location
 )
+for base in bases:
+    base.points *= np.array([tesselation_base, tesselation_height, 1])
+    base.points = mirror_plane.to_3D(base.points[:, :2])
 
-mirror_faces = np.array(mirror_faces)
+# if True: # Show bases
+#     p = pv.Plotter()
+#     for base in bases:
+#         p.add_mesh(base, show_edges=True)
+#     p.show()
+
+rt3 = np.sqrt(3)
+
 mirrors_3 = np.stack(  # The locations of the centers of the mirrors.
     [
-        mirror.center_of_mass()
-        for mirror in mirror_faces
+        base.center_of_mass()
+        for base in bases
     ],
     axis=0
 )  # shape: (tri_id, axis_id)
 
 ### Assign targets
-
 
 if use_cached_solution:
     print("Using cached mirror-target matching.")
@@ -142,7 +149,7 @@ else:
     print(f"Optimized in {end - start} seconds.")
     np.savetxt("cache/mirror_order.txt", best_mirror_reordering, fmt='%i')
 
-mirror_faces = mirror_faces[best_mirror_reordering]
+bases = bases[best_mirror_reordering]
 mirrors_3 = mirrors_3[best_mirror_reordering]
 
 ### Compute orientations

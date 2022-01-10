@@ -1,16 +1,13 @@
 from utilities.coordinate_math import Plane
 import aerosandbox.numpy as np
 import pyvista as pv
+
 rt3 = np.sqrt(3)
+
 
 def mesh_hexagon(
         n_rings: int = 2,
-        plane: Plane = None,
-        source_location = np.array([np.Inf, 0, 0])
 ):
-    if plane is None:
-        plane = Plane()
-
     mirror_faces = []
 
     for ring in np.arange(n_rings) + 1:
@@ -32,9 +29,7 @@ def mesh_hexagon(
 
                 tri.rotate_z(60 * side)
 
-                tri.points = plane.to_3D(tri.points[:, :2])
-
-                if np.dot(tri.face_normals[0, :], source_location - tri.center_of_mass()) < 0:
+                if tri.face_normals[0, 2] < 0:
                     tri.flip_normals()
 
                 tri.ring = ring
@@ -45,7 +40,8 @@ def mesh_hexagon(
 
     assert len(mirror_faces) == 6 * n_rings ** 2
 
-    return mirror_faces
+    return np.array(mirror_faces)
+
 
 if __name__ == '__main__':
     mf = mesh_hexagon(
@@ -56,5 +52,5 @@ if __name__ == '__main__':
         plotter.add_mesh(m, show_edges=True)
     plotter.add_axes()
     plotter.show_grid()
-    plotter.camera_position='xy'
+    plotter.camera_position = 'xy'
     plotter.show()
