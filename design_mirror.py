@@ -27,8 +27,8 @@ source_location = 15 * 12 * np.array([
 
 # Mirror properties
 n_rings = 7  # How many triangle-edges from the center of the big mirror to the outside?
-mirror_base_length = 24.65 / 25.4  # Note: assumed the mirrors are isoceles triangles, where "base" is the odd side length out.
-mirror_side_lengths = 27.38 / 25.4
+mirror_base = 24.65 / 25.4  # Note: assumed the mirrors are isoceles triangles, where "base" is the odd side length out.
+mirror_side = 27.38 / 25.4
 bevel_width = 0.8 / 25.4
 gap_width = 1.5 / 25.4  # What's the gap between adjacent triangles?
 bevel_height = 1.5 / 25.4
@@ -73,11 +73,25 @@ mirror_to_source = normalize(source_location - center_of_mirrors)
 mirror_to_target = normalize(center_of_targets - center_of_mirrors)
 mirror_plane_normal = normalize(mirror_to_source + mirror_to_target)
 
-### Compute mirror triangles
-mirror_height_length = (
-                               mirror_side_lengths ** 2 -
-                               (mirror_base_length / 2) ** 2
-                       ) ** 0.5
+### Compute mirror triangles and tesselating triangle dimensions
+mirror_height = (
+                        mirror_side ** 2 -
+                        (mirror_base / 2) ** 2
+                ) ** 0.5
+tesselation_base = (
+        mirror_base +
+        (bevel_width * gap_width) * (2 * mirror_height) / mirror_side +
+        gap_width * mirror_base / mirror_height
+)
+tesselation_height = (
+        gap_width +
+        mirror_height +
+        (bevel_width + gap_width) * (mirror_side / (mirror_base / 2))
+)
+tesselation_side = (
+                           (tesselation_base / 2) ** 2 +
+                           tesselation_height ** 2
+                   ) ** 0.5
 
 ### Compute locations of mirrors
 mirror_plane = Plane(
