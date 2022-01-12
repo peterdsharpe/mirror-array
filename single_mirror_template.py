@@ -24,7 +24,7 @@ bevel = pv.PolyData(
         [0, 0, 0],
         [b / 2, h, 0],
         [b, 0, 0],
-        [b + bev * s/h, 0, 0],
+        [b + bev * s / h, 0, 0],
         [b / 2, h + bev * s / (b / 2), 0],
         [bev * -s / h, 0, 0]
     ],
@@ -32,18 +32,18 @@ bevel = pv.PolyData(
 )
 bevel = bevel.triangulate()
 base = pv.Triangle([
-    [ # Top
-        b/2,
-        h + (bev + gap) * s/ (b/2),
+    [  # Top
+        b / 2,
+        h + (bev + gap) * s / (b / 2),
         0
     ],
-    [ # Left
-        (bev + gap) * -s / h - gap * (b/2) / h,
+    [  # Left
+        (bev + gap) * -s / h - gap * (b / 2) / h,
         -gap,
         0
     ],
-    [ # Right
-        b + (bev + gap) * s/h + gap * (b/2) / h,
+    [  # Right
+        b + (bev + gap) * s / h + gap * (b / 2) / h,
         -gap,
         0
     ],
@@ -65,9 +65,10 @@ mirror.points_bary = cart_to_bary(
 tesselation_base = base.bounds[1] - base.bounds[0]
 tesselation_height = base.bounds[3] - base.bounds[2]
 
-
 if __name__ == '__main__':
-    p = pv.Plotter()
+    from utilities.plotter import make_plotter
+
+    p = make_plotter('Single Mirror Template')
 
 
     def draw(mesh, color=None):
@@ -82,7 +83,5 @@ if __name__ == '__main__':
     draw(bevel.translate([0, 0, 1e-3], inplace=False), 'r')
     draw(mirror.translate([0, 0, 2e-3], inplace=False), 'w')
 
-    p.show_grid()
-    p.add_axes()
     p.camera_position = 'xy'
     p.show()

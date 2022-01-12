@@ -3,6 +3,7 @@ import pyvista as pv
 from utilities.vector import normalize, distance
 from utilities.coordinate_math import Plane, angle_axis_from_vectors
 from utilities.reflection_math import compute_orientations
+from utilities.plotter import make_plotter
 from typing import List, Dict
 from text_to_points.text_to_points import get_points_from_string
 import copy
@@ -262,26 +263,6 @@ for i in range(N):
     bevel_solids.append(pv.PolyData().merge([bevel_solid_down, bevel_solid_up]))
     base_solids.append(base_solid)
 
-if True:  # Debug
-    p = pv.Plotter()
-
-
-    def draw(mesh, color=None):
-        p.add_mesh(
-            mesh,
-            color=color,
-            show_edges=True
-        )
-
-
-    for i in range(N):
-        draw(base_solids[i], 'gray')
-        draw(bevel_solids[i].translate(1e-3 * mirror_plane.normal_3, inplace=False), 'r')
-        draw(mirror_solids[i].translate(2e-3 * mirror_plane.normal_3, inplace=False), 'w')
-    p.add_axes()
-    p.show_grid()
-    p.show()
-
 # Merge everything
 model = pv.PolyData().merge(
     mirror_solids + bevel_solids + base_solids
@@ -293,30 +274,30 @@ angle, axis = angle_axis_from_vectors(
     mirror_plane.normal_3,
     [0, 0, 1]
 )
-model_mm.rotate_vector(axis, angle * 180 / np.pi, point=mirror_plane.origin_3)
-model_mm.scale(25.4)
+model_mm.rotate_vector(axis, angle * 180 / np.pi, point=mirror_plane.origin_3, inplace=True)
+model_mm.scale(25.4, inplace=True)
 
 model_mm.save("to_print/print.stl")
 # model_mm.plot(show_grid=True)
 print("Written.")
 
 ### Draw everything
-plotter = pv.Plotter()
-plotter.add_light(pv.Light(
+p = make_plotter("Mirror for Marta")
+p.add_light(pv.Light(
     position=actual_source_location, focal_point=mirror_plane.origin_3
 ))
 
-plotter.add_mesh(model, pbr=False)
+p.add_mesh(model)
 
 for face in mirror_faces:
-    plotter.add_mesh(face,
-                     color=np.array([242, 222, 197]) / 255,
-                     pbr=True,
-                     # metallic=1,
-                     # roughness=0,
-                     )
+    p.add_mesh(face,
+               color=np.array([242, 222, 197]) / 255,
+               pbr=True,
+               # metallic=1,
+               # roughness=0,
+               )
 
-plotter.add_points(  # Draw the intended targets
+p.add_points(  # Draw the intended targets
     targets_3,
     color=0 * np.ones(3),
     point_size=5,
@@ -336,15 +317,7 @@ for i in range(N):
     )
 
     ### Draw line to target
-    # plotter.add_lines(
-    #     lines=np.array([
-    #         mirrors_3[i, :],
-    #         actual_target
-    #     ]),
-    #     color=0.2 * np.ones(3),
-    #     width=0.5,
-    # )
-    plotter.add_mesh(
+    p.add_mesh(
         pv.Spline(
             points=np.array([
                 mirrors_3[i, :],
@@ -354,23 +327,14 @@ for i in range(N):
         ),
         opacity=0.3
     )
-    plotter.add_points(
+    p.add_points(
         actual_target,
         color=1 * np.ones(3),
         point_size=5,
         opacity=1,
     )
 
-# plotter.add_mesh(
-#     pv.Sphere(radius=1, center=source_location),
-#     color="yellow"
-# )
-
-plotter.add_floor("-z")
-
-plotter.add_axes()
-plotter.show_grid()
-plotter.title = "Mirror for Marta"
-plotter.camera_position = 'xy'
-plotter.camera.roll = 90
-plotter.show()
+p.add_floor("-z")
+p.camera_position = 'xy'
+p.camera.roll = 90
+p.show()

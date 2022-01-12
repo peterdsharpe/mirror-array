@@ -48,10 +48,10 @@ if __name__ == '__main__':
     mf = mesh_hexagon(
         n_rings=7,
     )
-    plotter = pv.Plotter()
+    from utilities.plotter import make_plotter
+
+    p=make_plotter("Hexagon Meshing")
     for m in mf:
-        plotter.add_mesh(m, show_edges=True)
-    plotter.add_axes()
-    plotter.show_grid()
-    plotter.camera_position = 'xy'
-    plotter.show()
+        p.add_mesh(m, show_edges=True)
+    p.camera_position = 'xy'
+    p.show()
