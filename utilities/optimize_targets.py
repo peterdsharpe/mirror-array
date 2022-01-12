@@ -4,9 +4,8 @@ import numba
 
 distance_radius = 8
 
-
 @numba.njit(fastmath=True)
-def optimize_anneal(
+def optimize_targets(
         mirrors_3,
         targets_3,
         temp_start_rel=1,
@@ -167,8 +166,9 @@ def optimize_anneal(
                     print(iteration, current_loss, delta_loss, temperature)
 
         if iteration * 20 % n_iter == 0:
-            print(f"Iteration {iteration} of {n_iter}...")
+            # print(f"Iteration {iteration} of {n_iter}...")
+            print("Iteration ", iteration," of ", n_iter, "...")
 
     print("Final loss:", best_loss)
 
-    return best_mirror_order
+    return best_mirror_order, best_loss
