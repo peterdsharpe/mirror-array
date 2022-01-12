@@ -295,10 +295,11 @@ if __name__ == '__main__':
         [0, 0, 1]
     )
     model_mm.rotate_vector(axis, angle * 180 / np.pi, point=mirror_plane.origin_3, inplace=True)
+    model_mm.rotate_z(angle=-90, point=mirror_plane.origin_3, inplace=True)
     model_mm.scale(25.4, inplace=True)
 
     model_mm.save("to_print/print.stl")
-    # model_mm.plot(show_grid=True)
+    model_mm.plot(show_grid=True)
     print("Written.")
 
     ### Draw everything
