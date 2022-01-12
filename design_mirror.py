@@ -166,12 +166,12 @@ if __name__ == '__main__':
         start = time.perf_counter()
 
         kwargs = dict(
-                mirrors_3=mirrors_3,
-                targets_3=targets_3,
-                temp_start_rel=temp_start_rel,
-                temp_end_rel=temp_end_rel,
-                n_iter=n_iter,
-                verbose=verbose,
+            mirrors_3=mirrors_3,
+            targets_3=targets_3,
+            temp_start_rel=temp_start_rel,
+            temp_end_rel=temp_end_rel,
+            n_iter=n_iter,
+            verbose=verbose,
         )
 
         # best_mirror_reordering, _ = optimize_targets(**kwargs)
@@ -284,22 +284,35 @@ if __name__ == '__main__':
         base_solids.append(base_solid)
 
     # Merge everything
-    model = pv.PolyData().merge(
-        mirror_solids + bevel_solids + base_solids
-    )
     print("Generating, partitioning, and writing print files...")
-    model_mm = copy.deepcopy(model)
-
     angle, axis = angle_axis_from_vectors(
         mirror_plane.normal_3,
         [0, 0, 1]
     )
-    model_mm.rotate_vector(axis, angle * 180 / np.pi, point=mirror_plane.origin_3, inplace=True)
-    model_mm.rotate_z(angle=-90, point=mirror_plane.origin_3, inplace=True)
-    model_mm.scale(25.4, inplace=True)
 
-    model_mm.save("to_print/print.stl")
-    # model_mm.plot(show_grid=True)
+
+    def prepare_for_printing(meshes: List[pv.PolyData]) -> List[pv.PolyData]:
+        meshes_prepared = []
+        for mesh in meshes:
+            mesh_for_printing = mesh.rotate_vector(axis, angle * 180 / np.pi, point=mirror_plane.origin_3,
+                                                   inplace=False)
+            mesh_for_printing.rotate_z(angle=-90, point=mirror_plane.origin_3, inplace=True)
+            mesh_for_printing.scale(25.4, inplace=True)
+            meshes_prepared.append(mesh_for_printing)
+        return meshes_prepared
+
+
+    mirror_solids_for_printing = prepare_for_printing(mirror_solids)
+    bevel_solids_for_printing = prepare_for_printing(bevel_solids)
+    base_solids_for_printing = prepare_for_printing(base_solids)
+
+    model_for_printing = pv.PolyData().merge(
+        mirror_solids_for_printing +
+        bevel_solids_for_printing +
+        base_solids_for_printing
+    )
+
+    model_for_printing.save("to_print/print.stl")
     print("Written.")
 
     ### Draw everything
@@ -307,6 +320,12 @@ if __name__ == '__main__':
     p.add_light(pv.Light(
         position=actual_source_location, focal_point=mirror_plane.origin_3
     ))
+
+    model = pv.PolyData().merge(
+        mirror_solids +
+        bevel_solids+
+        base_solids
+    )
 
     p.add_mesh(model)
 
