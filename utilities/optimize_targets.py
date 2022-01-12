@@ -4,6 +4,7 @@ import numba
 
 distance_radius = 8
 
+
 @numba.njit(fastmath=True)
 def optimize_targets(
         mirrors_3,
@@ -165,9 +166,16 @@ def optimize_targets(
                 if verbose:
                     print(iteration, current_loss, delta_loss, temperature)
 
-        if iteration * 20 % n_iter == 0:
-            # print(f"Iteration {iteration} of {n_iter}...")
-            print("Iteration ", iteration," of ", n_iter, "...")
+        if iteration % 1000000 == 0:
+            print(
+                "Iteration ",
+                iteration // 1000000,
+                "M of ",
+                n_iter // 1e6,
+                "M, "
+                , 100 * iteration / n_iter,
+                "% done."
+            )
 
     print("Final loss:", best_loss)
 

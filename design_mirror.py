@@ -54,7 +54,7 @@ if __name__ == '__main__':
     use_cached_solution = True
     temp_start_rel = 1
     temp_end_rel = 1e-8
-    n_iter = 1e8  # Note: Asymptotic runtime of ~220,000 iterations/second on my machine.
+    n_iter = 1e8  # Note: Asymptotic runtime of ~220,000 iterations/second on my machine, 100,000 on SuperCloud.
     verbose = False
 
     ### Setup
@@ -354,7 +354,7 @@ if __name__ == '__main__':
             opacity=1,
         )
 
-    p.add_floor("-z")
+    # p.add_floor("-z")
     p.camera_position = 'xy'
     p.camera.roll = 90
     p.show()
