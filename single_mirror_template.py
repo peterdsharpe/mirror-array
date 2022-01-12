@@ -5,8 +5,9 @@ import copy
 
 mirror_base = b = 24.65 / 25.4  # Note: assumed the mirrors are isoceles triangles, where "base" is the odd side length out.
 mirror_side = s = 27.38 / 25.4
-bevel_width = bev = 1 / 25.4
-gap_width = gap = 1 / 25.4  # What's the gap between adjacent triangles?
+bevel_width = bev = 0.4 / 25.4
+gap_width = gap = 1.5 / 25.4  # What's the gap between adjacent triangles?
+bevel_height = 1 / 25.4
 
 mirror_height = h = (
                             s ** 2 -
@@ -29,6 +30,7 @@ bevel = pv.PolyData(
     ],
     faces=[4, 0, 1, 4, 5, 4, 1, 2, 3, 4]
 )
+bevel = bevel.triangulate()
 base = pv.Triangle([
     [ # Top
         b/2,
@@ -60,14 +62,11 @@ mirror.points_bary = cart_to_bary(
     vertices_cart=base.points
 )
 
+tesselation_base = base.bounds[1] - base.bounds[0]
+tesselation_height = base.bounds[3] - base.bounds[2]
+
 
 if __name__ == '__main__':
-    bevel.translate([0, 0, 1e-3], inplace=True)
-    mirror.translate([0, 0, 2e-3], inplace=True)
-
-    # bevel = bevel.extrude(vector=[0, 0, 1], capping=True)
-    # mirror = mirror.extrude(vector=[0, 0, 1], capping=True)
-
     p = pv.Plotter()
 
 
@@ -80,8 +79,8 @@ if __name__ == '__main__':
 
 
     draw(base, 'gray')
-    draw(bevel, 'r')
-    draw(mirror, 'w')
+    draw(bevel.translate([0, 0, 1e-3], inplace=False), 'r')
+    draw(mirror.translate([0, 0, 2e-3], inplace=False), 'w')
 
     p.show_grid()
     p.add_axes()

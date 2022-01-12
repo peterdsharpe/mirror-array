@@ -3,3 +3,4 @@ scipy
 numba
 aerosandbox
 svgpathtools
+pyvista

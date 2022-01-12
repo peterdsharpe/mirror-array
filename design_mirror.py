@@ -1,6 +1,6 @@
 import aerosandbox.numpy as np
 import pyvista as pv
-from utilities.vector import normalize
+from utilities.vector import normalize, distance
 from utilities.coordinate_math import Plane, angle_axis_from_vectors
 from utilities.reflection_math import compute_orientations
 from typing import List, Dict
@@ -27,11 +27,6 @@ source_location = 15 * 12 * np.array([
 
 # Mirror properties
 n_rings = 7  # How many triangle-edges from the center of the big mirror to the outside?
-mirror_base = 24.65 / 25.4  # Note: assumed the mirrors are isoceles triangles, where "base" is the odd side length out.
-mirror_side = 27.38 / 25.4
-bevel_width = 0.8 / 25.4
-gap_width = 1.5 / 25.4  # What's the gap between adjacent triangles?
-bevel_height = 1.5 / 25.4
 
 N = 6 * n_rings ** 2  # The total number of triangles there will be
 
@@ -73,26 +68,6 @@ mirror_to_source = normalize(source_location - center_of_mirrors)
 mirror_to_target = normalize(center_of_targets - center_of_mirrors)
 mirror_plane_normal = normalize(mirror_to_source + mirror_to_target)
 
-### Compute mirror triangles and tesselating triangle dimensions
-mirror_height = (
-                        mirror_side ** 2 -
-                        (mirror_base / 2) ** 2
-                ) ** 0.5
-tesselation_base = (
-        mirror_base +
-        (bevel_width * gap_width) * (2 * mirror_height) / mirror_side +
-        gap_width * mirror_base / mirror_height
-)
-tesselation_height = (
-        gap_width +
-        mirror_height +
-        (bevel_width + gap_width) * (mirror_side / (mirror_base / 2))
-)
-tesselation_side = (
-                           (tesselation_base / 2) ** 2 +
-                           tesselation_height ** 2
-                   ) ** 0.5
-
 ### Compute locations of mirrors
 mirror_plane = Plane(
     origin_3=center_of_mirrors,
@@ -102,25 +77,74 @@ mirror_plane = Plane(
 
 from utilities.mesh_hexagon import mesh_hexagon
 
-bases: List[Dict[str, pv.PolyData]] = mesh_hexagon(
+base_faces: List[pv.PolyData] = mesh_hexagon(
     n_rings=n_rings,
 )
-for base in bases:
-    base.points *= np.array([tesselation_base, tesselation_height, 1])
-    base.points = mirror_plane.to_3D(base.points[:, :2])
 
-# if True: # Show bases
-#     p = pv.Plotter()
-#     for base in bases:
-#         p.add_mesh(base, show_edges=True)
-#     p.show()
+from single_mirror_template import (
+    tesselation_base,
+    tesselation_height,
+    mirror as mirror_template,
+    bevel as bevel_template,
+    base as base_template
+)
+from utilities.barycentric import bary_to_cart
 
-rt3 = np.sqrt(3)
+for base_face in base_faces:
+    base_face.points *= np.array([tesselation_base, tesselation_height, 1]).reshape((1, -1))
+
+### Make mirror faces and bevels
+mirror_faces = []
+bevel_faces = []
+
+from utilities.misc import get_index_of_unique
+
+for base_face in base_faces:
+    top_vertex_index = get_index_of_unique([
+        distance(base_face.points[1, :], base_face.points[2, :]),
+        distance(base_face.points[2, :], base_face.points[0, :]),
+        distance(base_face.points[0, :], base_face.points[1, :]),
+    ])
+    top_vertex = base_face.points[top_vertex_index, :]
+    left_vertex = base_face.points[(top_vertex_index + 1) % 3, :]
+    right_vertex = base_face.points[(top_vertex_index + 2) % 3, :]
+    this_vertices = [
+        top_vertex,
+        left_vertex,
+        right_vertex,
+    ]
+    this_mirror = pv.PolyData(
+        bary_to_cart(
+            mirror_template.points_bary,
+            vertices_cart=this_vertices
+        ),
+        faces=mirror_template.faces
+    )
+    if this_mirror.face_normals[0, 2] < 0:
+        this_mirror.flip_normals()
+
+    this_bevel = pv.PolyData(
+        bary_to_cart(
+            bevel_template.points_bary,
+            vertices_cart=this_vertices
+        ),
+        faces=bevel_template.faces
+    )
+    if this_bevel.face_normals[0, 2] < 0:
+        this_bevel.flip_normals()
+
+    # put everything on the mirrors plane
+    base_face.points = mirror_plane.to_3D(base_face.points[:, :2])
+    this_mirror.points = mirror_plane.to_3D(this_mirror.points[:, :2])
+    this_bevel.points = mirror_plane.to_3D(this_bevel.points[:, :2])
+
+    mirror_faces.append(this_mirror)
+    bevel_faces.append(this_bevel)
 
 mirrors_3 = np.stack(  # The locations of the centers of the mirrors.
     [
         base.center_of_mass()
-        for base in bases
+        for base in base_faces
     ],
     axis=0
 )  # shape: (tri_id, axis_id)
@@ -149,7 +173,9 @@ else:
     print(f"Optimized in {end - start} seconds.")
     np.savetxt("cache/mirror_order.txt", best_mirror_reordering, fmt='%i')
 
-bases = bases[best_mirror_reordering]
+base_faces = np.array(base_faces)[best_mirror_reordering]
+mirror_faces = np.array(mirror_faces)[best_mirror_reordering]
+bevel_faces = np.array(bevel_faces)[best_mirror_reordering]
 mirrors_3 = mirrors_3[best_mirror_reordering]
 
 ### Compute orientations
@@ -159,107 +185,107 @@ mirror_normals_3 = compute_orientations(
     target_locations=targets_3
 )
 
-
 ### Make actual mesh
-# Rotate the mirrors to the necessary orientations
-def rotate_mirror_to_normal(mirror, normal_3):
-    starting_normal = mirror.face_normals[0, :]
+# Rotate the mirrors and their bevels to the necessary orientations
+for i in range(N):
+    starting_normal = mirror_faces[i].face_normals[0, :]
     angle, axis = angle_axis_from_vectors(
         starting_normal,
-        normal_3,
+        mirror_normals_3[i, :]
     )
-    mirror.rotate_vector(vector=axis, angle=180 / np.pi * angle, point=mirror.center_of_mass())
-    assert np.allclose(mirror.face_normals[0, :], normal_3, atol=1e-4, rtol=1e-4)
-    return mirror
-
-
-mirror_faces = [
-    rotate_mirror_to_normal(mirror, normal)
-    for mirror, normal in zip(mirror_faces, mirror_normals_3)
-]
-
-
-# Add in bevels
-def make_bevel(
-        mirror,
-        far_corner_id=0,
-):
-    corners = np.roll(mirror.points, far_corner_id, axis=0)
-    bevel = pv.PolyData(
-        [
-            corners[1, :],
-            corners[2, :],
-            corners[2, :] + bevel_width * normalize(corners[0, :] - corners[2, :]),
-            corners[1, :] + bevel_width * normalize(corners[0, :] - corners[1, :]),
-        ],
-        faces=[
-            4, 0, 1, 2, 3,
-        ]
+    rotation_center = base_faces[i].center_of_mass()
+    mirror_faces[i].rotate_vector(
+        vector=axis,
+        angle=180 / np.pi * angle,
+        point=rotation_center,
+        inplace=True
     )
-    bevel = bevel.extrude(vector=bevel_height * mirror_plane.normal_3, capping=True)
-    bevel.points_to_double()
-    return bevel
+    bevel_faces[i].rotate_vector(
+        vector=axis,
+        angle=180 / np.pi * angle,
+        point=rotation_center,
+        inplace=True
+    )
+    assert np.allclose(
+        mirror_faces[i].face_normals[0, :],
+        mirror_normals_3[i, :],
+        atol=1e-4,
+        rtol=1e-4,
+    )
 
+mirrors = np.array([])
 
-bevels = []
-for far_corner_id in [1, 2]:
-    for mirror in mirror_faces:
-        bevels.append(make_bevel(mirror, far_corner_id))
-
-# Extrude the mirrors
-mirror_corners_3 = np.concatenate(
-    [
-        face.points
-        for face in mirror_faces
-    ], axis=0
-)  # shape: (corner_id, axis_id)
-depth = np.dot(
-    mirror_corners_3 - mirror_plane.origin_3.reshape((1, 3)),
-    mirror_plane.normal_3
-).max()
-
-mirror_solids = [
-    mirror.extrude(vector=-3 * depth * mirror_plane.normal_3, capping=True)
-    for mirror in mirror_faces
-]
-for m in mirror_solids:
-    m.points_to_double()
-
-# Make the base
-base = pv.Polygon(
-    center=[0, 0, 0],
-    normal=[0, 0, 1],
-    radius=1,
-    n_sides=6
+# Determine how far back the base needs to be
+all_points = np.concatenate(
+    [m.points for m in mirror_faces] + [b.points for b in bevel_faces],
+    axis=0
 )
-base.points = np.array([
-    [0, 1, 0],
-    [rt3 / 2, 0.5, 0],
-    [rt3 / 2, -0.5, 0],
-    [0, -1, 0],
-    [-rt3 / 2, -0.5, 0],
-    [-rt3 / 2, 0.5, 0]
+base_depth = np.min([
+    np.dot(point - mirror_plane.origin_3, mirror_plane.normal_3)
+    for point in all_points
 ])
-base.rotate_z(30)
-base.scale(n_rings * (side_length + gap_width * rt3) + gap_width * 2 / rt3)
-base.points = mirror_plane.to_3D(
-    base.points[:, :2]
-)
+base_depth_vector = base_depth * mirror_plane.normal_3
 
-base.translate(-depth * mirror_plane.normal_3)
-base = base.extrude(vector=-3 * depth * mirror_plane.normal_3, capping=True)
-base.points_to_double()
+# Push the base faces back that far
+for i in range(N):
+    base_faces[i].points += np.reshape(base_depth_vector, (1, 3))
+
+### Extrude all faces into solids
+mirror_solids = []
+bevel_solids = []
+base_solids = []
+
+from single_mirror_template import bevel_height
+
+for i in range(N):
+    mirror_solid: pv.PolyData = mirror_faces[i].extrude(
+        vector=1.5 * base_depth_vector,
+        capping=True
+    )
+
+    bevel_solid_down: pv.PolyData = bevel_faces[i].extrude(
+        vector=1.5 * base_depth_vector,
+        capping=True
+    )
+
+    bevel_solid_up: pv.PolyData = bevel_faces[i].extrude(
+        vector=bevel_height * mirror_plane.normal_3,
+        capping=True
+    )
+
+    base_solid: pv.PolyData = base_faces[i].extrude(
+        vector=1.5 * base_depth_vector,
+        capping=True
+    )
+
+    mirror_solids.append(mirror_solid)
+    bevel_solids.append(pv.PolyData().merge([bevel_solid_down, bevel_solid_up]))
+    base_solids.append(base_solid)
+
+if True:  # Debug
+    p = pv.Plotter()
+
+
+    def draw(mesh, color=None):
+        p.add_mesh(
+            mesh,
+            color=color,
+            show_edges=True
+        )
+
+
+    for i in range(N):
+        draw(base_solids[i], 'gray')
+        draw(bevel_solids[i].translate(1e-3 * mirror_plane.normal_3, inplace=False), 'r')
+        draw(mirror_solids[i].translate(2e-3 * mirror_plane.normal_3, inplace=False), 'w')
+    p.add_axes()
+    p.show_grid()
+    p.show()
 
 # Merge everything
-things = [base] + mirror_solids + bevels
-things = [
-    thing.triangulate()
-    for thing in things
-]
-
-model = pv.PolyData().merge(things)
-
-### Export print
+model = pv.PolyData().merge(
+    mirror_solids + bevel_solids + base_solids
+)
 print("Generating, partitioning, and writing print files...")
 model_mm = copy.deepcopy(model)
 

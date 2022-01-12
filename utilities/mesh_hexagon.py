@@ -21,16 +21,17 @@ def mesh_hexagon(
                 ])
 
                 if (ring + stride) % 2 == 0:
-                    tri.flip_y()
+                    tri.flip_y(inplace=True)
 
-                tri.translate([0, inside_radius, 0])
+                tri.translate([0, inside_radius, 0], inplace=True)
 
-                tri.translate([stride / 2, 0, 0])
+                tri.translate([stride / 2, 0, 0], inplace=True)
 
-                tri.rotate_z(60 * side)
+                tri.rotate_z(60 * side, inplace=True)
 
                 if tri.face_normals[0, 2] < 0:
                     tri.flip_normals()
+                    assert np.all(tri.face_normals == np.array([0, 0, 1]))
 
                 tri.ring = ring
                 tri.side = side
