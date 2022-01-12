@@ -7,7 +7,7 @@ mirror_base = b = 24.65 / 25.4  # Note: assumed the mirrors are isoceles triangl
 mirror_side = s = 27.38 / 25.4
 bevel_width = bev = 0.4 / 25.4
 gap_width = gap = 1.5 / 25.4  # What's the gap between adjacent triangles?
-bevel_height = 1 / 25.4
+bevel_height = 0.5 / 25.4
 
 mirror_height = h = (
                             s ** 2 -

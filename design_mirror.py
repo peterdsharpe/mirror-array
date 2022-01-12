@@ -299,7 +299,7 @@ if __name__ == '__main__':
     model_mm.scale(25.4, inplace=True)
 
     model_mm.save("to_print/print.stl")
-    model_mm.plot(show_grid=True)
+    # model_mm.plot(show_grid=True)
     print("Written.")
 
     ### Draw everything
