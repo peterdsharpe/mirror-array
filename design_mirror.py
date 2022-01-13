@@ -6,9 +6,7 @@ from utilities.reflection_math import compute_orientations
 from utilities.plotter import make_plotter
 from typing import List, Dict
 from text_to_points.text_to_points import get_points_from_string
-import copy
 import ray
-import functools
 
 if not ray.is_initialized():
     print("Initializing...")
