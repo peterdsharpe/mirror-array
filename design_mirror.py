@@ -46,7 +46,7 @@ target_plane = Plane(
 actual_source_location = np.copy(source_location)
 # actual_source_location = 15 * 12 * normalize(source_location)
 actual_focal_plane = Plane(
-    origin_3=np.array([36, 0, -41.5]) * 2,
+    origin_3=np.array([36, 0, -41.5]),
     normal_3=np.array([0, 0, 1]),
 )
 
@@ -333,14 +333,15 @@ model = pv.PolyData().merge(
     base_solids
 )
 
+# model.rotate_y(20, inplace=True)
+# mirror_faces = [m.rotate_y(20, inplace=False) for m in mirror_faces]
+
 p.add_mesh(model)
 
 for face in mirror_faces:
     p.add_mesh(face,
                color=np.array([242, 222, 197]) / 255,
                pbr=True,
-               # metallic=1,
-               # roughness=0,
                )
 
 p.add_points(  # Draw the intended targets
@@ -353,12 +354,12 @@ p.add_points(  # Draw the intended targets
 # Draw optics and actual targets
 for i in range(N):
     ### Compute *actual* optics
-    actual_normal = mirror_normals_3[i, :]
-    actual_source_to_mirror = normalize(mirrors_3[i, :] - actual_source_location)
+    actual_normal = mirror_faces[i].face_normals[0, :]
+    actual_source_to_mirror = normalize(mirror_faces[i].center_of_mass() - actual_source_location)
     actual_outgoing_ray_direction = normalize(
         actual_source_to_mirror - 2 * np.dot(actual_source_to_mirror, actual_normal) * actual_normal)
     actual_target = actual_focal_plane.intersection_with_line_3(
-        line_origin_3=mirrors_3[i, :],
+        line_origin_3=mirror_faces[i].center_of_mass(),
         line_direction_3=actual_outgoing_ray_direction,
     )
 
@@ -366,7 +367,7 @@ for i in range(N):
     p.add_mesh(
         pv.Spline(
             points=np.array([
-                mirrors_3[i, :],
+                mirror_faces[i].center_of_mass(),
                 actual_target
             ]),
             n_points=2
