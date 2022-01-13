@@ -62,8 +62,8 @@ mirror.points_bary = cart_to_bary(
     vertices_cart=base.points
 )
 
-tesselation_base = base.bounds[1] - base.bounds[0]
-tesselation_height = base.bounds[3] - base.bounds[2]
+tesselation_x_scale = base.bounds[1] - base.bounds[0]
+tesselation_y_scale = (base.bounds[3] - base.bounds[2]) / (3 ** 0.5 / 2)
 
 if __name__ == '__main__':
     from utilities.plotter import make_plotter

@@ -5,7 +5,7 @@ import numba
 distance_radius = 8
 
 
-@numba.njit(fastmath=True)
+@numba.njit()
 def optimize_targets(
         mirrors_3,
         targets_3,
