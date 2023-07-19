@@ -4,3 +4,4 @@ numba
 aerosandbox
 svgpathtools
 pyvista
+ray
