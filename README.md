@@ -2,6 +2,8 @@
 
 A fun project to 3D print a mirror array that, when held in the sunlight, projects a cute message onto the ground via its reflection.
 
+Check out [the final mirror geometry here](./to_print/print_manifold.stl). See [here](design_mirror.py) for the main design code.
+
 Concept inspired by [a similar project by @bencbartlett](https://github.com/bencbartlett/3D-printed-mirror-array), but all code in this repository is written from scratch.
 
 The mirror consists of 294 individual triangular mirrors (roughly 1" side length) arranged into a hexagon. Each is held at a very precise, slightly-different angle, which results in a triangular spot of light projected onto the ground. The spots of light combine to form a message.
