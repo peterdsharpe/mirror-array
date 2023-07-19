@@ -44,7 +44,11 @@ target_plane = Plane(
     x_hat_3=np.array([0, -1, 0])
 )
 actual_source_location = np.copy(source_location)
-# actual_source_location = 15 * 12 * normalize(source_location)
+# actual_source_location = 5 * 12 * normalize(source_location)
+# actual_source_location = 1e6 * np.array([
+#     np.cosd(50), 0, np.sind(50)
+# ])
+
 actual_focal_plane = Plane(
     origin_3=np.array([36, 0, -41.5]),
     normal_3=np.array([0, 0, 1]),
@@ -322,6 +326,9 @@ model_for_printing.save("to_print/print.stl")
 print("Written.")
 
 ### Draw everything
+from pyvista import themes
+pv.set_plot_theme(themes.DarkTheme())
+
 p = make_plotter("Mirror for Marta")
 p.add_light(pv.Light(
     position=actual_source_location, focal_point=mirror_plane.origin_3
@@ -333,8 +340,8 @@ model = pv.PolyData().merge(
     base_solids
 )
 
-# model.rotate_y(20, inplace=True)
-# mirror_faces = [m.rotate_y(20, inplace=False) for m in mirror_faces]
+# model.rotate_y(-20, inplace=True)
+# mirror_faces = [m.rotate_y(-20, inplace=False) for m in mirror_faces]
 
 p.add_mesh(model)
 
@@ -375,7 +382,7 @@ for i in range(N):
         opacity=0.3
     )
     p.add_points(
-        actual_target,
+        actual_target + np.array([0, 0, 1e-3]),
         color=1 * np.ones(3),
         point_size=5,
         opacity=1,
