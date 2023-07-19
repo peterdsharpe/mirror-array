@@ -43,7 +43,7 @@ import matplotlib.pyplot as plt
 import aerosandbox.tools.pretty_plots as p
 
 
-def get_points_from_string(s: str = "Testing", n_points=200, line_spacing=1.5, kerning=1):
+def get_points_from_string(s: str = "Testing", n_points=200, line_spacing=1.5, kerning: float = 1):
     # Clean up string
     s = "\n".join([line.strip() for line in s.split("\n")])  # strip spaces off each line
     admissible_characters = alphabet_characters + "\n" + " "
@@ -118,15 +118,15 @@ def get_points_from_string(s: str = "Testing", n_points=200, line_spacing=1.5, k
 
 if __name__ == '__main__':
     fig, ax = plt.subplots()
-    s = "H"#"Marta you are\nmy sunshine"
-    n_points = 20
-    c = get_points_from_string(s, n_points)
+    s = "M"
+    n_points = 96
+    c = get_points_from_string(s, n_points, kerning=1.5)
     plt.plot(
         c[:, 0],
         c[:, 1],
         ".",
-        markersize=20,
-        alpha=0.3
+        markersize=10,
+        alpha=0.5
     )
     p.equal()
     p.show_plot()
