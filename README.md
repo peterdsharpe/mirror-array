@@ -14,7 +14,7 @@ The true challenge of this project isn't in computing any individual mirror orie
 
 The reason that this matters is that a poorly-matched mapping of mirrors to targets will result in a blurry, unreadable message if the focal plane distance or orientation is even slightly off. Ideally, adjacent light rays should be as close to perfectly collimated as possible.
 
-This means that the mirror-target matching problem is a combinatorial optimization problem with $294!$, or $\approx 10^{600}$ possible solutions, an incomprehensibly-huge search space. To solve this, we run a simulated annealing algorithm to find a good-enough solution in a reasonable amount of time - but even this takes a supercomputer.
+This means that the mirror-target matching problem is a combinatorial optimization problem with $294!$, or $\approx 10^{600}$ possible configurations, an incomprehensibly-huge search space. To solve this, we run a simulated annealing algorithm to find a good-enough solution in a reasonable amount of time - but even this takes a supercomputer. In total, around 5 billion configurations were analyzed to obtain the actual manufactured geometry here.
 
 ![mirror1](./media/mirror1.png)
 
